@@ -1,5 +1,29 @@
 # Changelog — dylanmaudio-apps (Bitfocus Companion module)
 
+## Unreleased
+
+Ground work for Companion on another machine than the apps (#106): a
+CompanionPi, through a tunnel today and the apps' LAN access later.
+
+- **A bridge or app that stops answering shows within about 20 s.** A Mac
+  that sleeps, or a network that drops, used to leave the connection green
+  for about 70 s, and presses in that time changed the keys but never
+  arrived. While a stream is quiet the module now asks whether the app is
+  still there. A lost press logs a warning and asks at once.
+- **Console is answering goes off when the bridge goes away.** It stayed
+  lit, and `$(dlive:connected)` true, after the bridge quit or became
+  unreachable.
+- **Tokens are secrets.** The bridge token is a secret-text field, kept in
+  Companion's secrets store rather than the connection config; an upgrade
+  script moves one that was set. It also goes to the bridge app's control
+  port. Each app connection has an **App token** too. Both stay empty while
+  the apps accept connections from their own Mac only.
+- **A refused token says so**, and is asked about every 10 s, not read as
+  an expired lane and retried every 2 s.
+- Status messages give the address and the reason (connection refused, no
+  answer, unreachable, address not found), and no longer say "this Mac"
+  about an app on another one. An IPv6 bridge address makes a valid URL.
+
 ## 1.0.3 — 2026-09
 
 - **Cue list, Scene Go / Next / Previous and Send CC to the Surface now

@@ -43,6 +43,13 @@ export class CtlMock {
 	seq = 0
 	resyncOnce = false
 	resyncs = 0
+	/** a dead link: nothing is answered and nothing more reaches a stream, but nothing closes */
+	frozen = false
+	/** answer every request 401 with this message, as an app that won't take the token would */
+	refuse: string | null = null
+	/** a press's handler that takes this long to return */
+	cmdDelayMs = 0
+	private held: ServerResponse[] = []
 	private ring: { seq: number; frame: string }[] = []
 	private streams = new Set<ServerResponse>()
 	requests: { method: string; path: string; headers: IncomingMessage['headers']; body?: Record<string, unknown> }[] = []
@@ -73,6 +80,7 @@ export class CtlMock {
 	}
 
 	emit(kind: string, payload: Record<string, unknown>): void {
+		if (this.frozen) return
 		this.seq++
 		const frame = `id: ${this.seq}\nevent: ${kind}\ndata: ${JSON.stringify({ ...payload, v: 1, seq: this.seq, ts: Date.now() })}\n\n`
 		this.ring.push({ seq: this.seq, frame })
@@ -94,10 +102,15 @@ export class CtlMock {
 			body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
 		}
 		this.requests.push({ method: req.method ?? '', path, headers: req.headers, body })
+		if (this.frozen) {
+			this.held.push(res)
+			return
+		}
 		const json = (status: number, obj: unknown) => {
 			res.writeHead(status, { 'Content-Type': 'application/json' })
 			res.end(JSON.stringify(obj))
 		}
+		if (this.refuse !== null) return json(401, { ok: false, error: { code: 'unauthorized', message: this.refuse } })
 		switch (`${req.method} ${path}`) {
 			case 'GET /ctl/v1/info':
 				return json(200, {
@@ -139,6 +152,7 @@ export class CtlMock {
 				return
 			}
 			case 'POST /ctl/v1/cmd': {
+				if (this.cmdDelayMs) await new Promise((r) => setTimeout(r, this.cmdDelayMs))
 				const c = fx.cases.find(
 					(x) =>
 						x.request.path === '/ctl/v1/cmd' &&

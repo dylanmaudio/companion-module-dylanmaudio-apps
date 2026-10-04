@@ -11,10 +11,12 @@ import {
 import {
 	GetConfigFields,
 	normaliseConfig,
+	normaliseSecrets,
 	parseActionsMap,
 	parseSceneNames,
 	type ActionMapEntry,
 	type ModuleConfig,
+	type ModuleSecrets,
 } from './config.js'
 import type { ModuleContext } from './context.js'
 import { BridgeLink } from './bridge/bridgelink.js'
@@ -52,7 +54,7 @@ import type { Catalogue } from './control/types.js'
 
 export type ModuleSchema = {
 	config: ModuleConfig
-	secrets: undefined
+	secrets: ModuleSecrets
 	actions: ActionsSchema
 	feedbacks: FeedbacksSchema
 	variables: VariablesSchema
@@ -66,10 +68,13 @@ const STATUS_MAP: Record<LinkStatus, InstanceStatus> = {
 	probing: InstanceStatus.Connecting,
 	ok: InstanceStatus.Ok,
 	failure: InstanceStatus.ConnectionFailure,
+	refused: InstanceStatus.BadConfig,
 }
 
 export default class DliveInstance extends InstanceBase<ModuleSchema> implements ModuleContext {
 	config: ModuleConfig = normaliseConfig(null)
+	/** The tokens, kept out of the config (config.ts) */
+	secrets: ModuleSecrets = normaliseSecrets(null)
 	link!: LinkApi
 	actionsMap: ActionMapEntry[] = []
 	private scope: VariableScope = { inputs: 128, extendedTypes: true }
@@ -90,8 +95,9 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 		super(internal)
 	}
 
-	async init(config: ModuleConfig): Promise<void> {
+	async init(config: ModuleConfig, _isFirstInit = false, secrets?: ModuleSecrets): Promise<void> {
 		this.config = normaliseConfig(config)
+		this.secrets = normaliseSecrets(secrets)
 		if (this.config.app !== 'bridge') {
 			this.startControlMode()
 			return
@@ -110,9 +116,11 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 		if (this.feedbackFlush) clearTimeout(this.feedbackFlush)
 	}
 
-	async configUpdated(config: ModuleConfig): Promise<void> {
+	async configUpdated(config: ModuleConfig, secrets?: ModuleSecrets): Promise<void> {
 		const prev = this.config
+		const prevSecrets = this.secrets
 		this.config = normaliseConfig(config)
+		if (secrets !== undefined) this.secrets = normaliseSecrets(secrets)
 		// Switching app type is a different connection entirely: tear down
 		// whatever was running and start the other kind from scratch.
 		const wasControl = prev.app !== 'bridge'
@@ -123,7 +131,8 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 				isControl &&
 				prev.app === this.config.app &&
 				prev.ctlHost === this.config.ctlHost &&
-				prev.ctlPort === this.config.ctlPort
+				prev.ctlPort === this.config.ctlPort &&
+				prevSecrets.ctlToken === this.secrets.ctlToken
 			if (same) {
 				this.control?.configureTalkFlash(
 					this.config.talkFlashHz,
@@ -147,10 +156,11 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 			this.applyConfig(true)
 			return
 		}
+		const tokenChanged = prevSecrets.bridgeToken !== this.secrets.bridgeToken
 		const bridgeChanged =
 			prev.bridgeHost !== this.config.bridgeHost ||
 			prev.bridgePort !== this.config.bridgePort ||
-			prev.bridgeToken !== this.config.bridgeToken ||
+			tokenChanged ||
 			// the cold sync is built from these, and the link holds them
 			prev.syncScope !== this.config.syncScope ||
 			prev.inputs !== this.config.inputs ||
@@ -161,7 +171,7 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 			this.link = this.makeLink()
 			this.wireLink()
 		}
-		if (prev.bridgeHost !== this.config.bridgeHost || prev.bridgeCtlPort !== this.config.bridgeCtlPort)
+		if (prev.bridgeHost !== this.config.bridgeHost || prev.bridgeCtlPort !== this.config.bridgeCtlPort || tokenChanged)
 			this.startBridgeApp()
 		this.applyConfig(false)
 	}
@@ -239,7 +249,7 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 	/** Persist the import in the connection config, then re-derive everything from it. */
 	private async storeShowImport(showImport: string): Promise<void> {
 		this.config = { ...this.config, showImport }
-		this.saveConfig(this.config)
+		this.saveConfig(this.config, undefined) // the secrets are unchanged
 		await this.reloadShowFile()
 		this.publishDefinitions()
 	}
@@ -251,6 +261,7 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 			talkFlashHz: this.config.talkFlashHz,
 			talkFlashCooldownS: this.config.talkFlashCooldownS,
 			talkFlashPage: this.config.talkFlashPage,
+			token: this.secrets.ctlToken || undefined,
 			cachedCatalogue: parseCatalogue(this.config.ctlCatalogue),
 			onCatalogue: (cat) => this.keepCatalogue('ctlCatalogue', cat),
 		})
@@ -261,6 +272,8 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 	protected startBridgeApp(): void {
 		this.stopBridgeApp()
 		const app = new BridgeAppControl(this, this.config.bridgeHost, this.config.bridgeCtlPort, {
+			// one token for the bridge: its core's Client API and its app's control port
+			token: this.secrets.bridgeToken || undefined,
 			cached: parseCatalogue(this.config.bridgeCtlCatalogue),
 			onCatalogue: (cat) => this.keepCatalogue('bridgeCtlCatalogue', cat),
 		})
@@ -277,7 +290,7 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 	/** Keep an app's catalogue in the connection config for the next start (not a form field). */
 	private keepCatalogue(key: 'ctlCatalogue' | 'bridgeCtlCatalogue', cat: Catalogue): void {
 		this.config = { ...this.config, [key]: JSON.stringify(cat) }
-		this.saveConfig(this.config)
+		this.saveConfig(this.config, undefined) // the secrets are unchanged
 	}
 
 	private stopBridgeApp(): void {
@@ -322,7 +335,7 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 		return new BridgeLink({
 			host: this.config.bridgeHost,
 			port: this.config.bridgePort,
-			token: this.config.bridgeToken || undefined,
+			token: this.secrets.bridgeToken || undefined,
 			laneName: this.label,
 			baseChannel: this.config.baseChannel,
 			strips: scopedStrips({ inputs: this.config.inputs, extendedTypes: this.config.extendedTypes }),

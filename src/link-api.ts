@@ -19,7 +19,8 @@ import type { ConsoleState } from './state/model.js'
 import type { SubscriptionRegistry } from './state/subscriptions.js'
 export type SyncScope = 'names' | 'names_state' | 'all' | 'none'
 
-export type LinkStatus = 'disconnected' | 'connecting' | 'probing' | 'ok' | 'failure'
+/** `refused`: the far end won't take this connection as configured (a token) — retrying can't fix it */
+export type LinkStatus = 'disconnected' | 'connecting' | 'probing' | 'ok' | 'failure' | 'refused'
 
 export interface LinkEvents {
 	changed: [paths: string[]]

@@ -57,12 +57,15 @@ const STATUS: Record<ControlStatus, InstanceStatus> = {
 	not_allowed: InstanceStatus.UnknownWarning,
 	mismatch: InstanceStatus.BadConfig,
 	failure: InstanceStatus.ConnectionFailure,
+	refused: InstanceStatus.BadConfig,
 }
 
 export interface ControlModeOptions {
 	talkFlashHz: number
 	talkFlashCooldownS: number
 	talkFlashPage: number
+	/** Sent with every request: for the LAN access the apps will grow (#106) */
+	token?: string
 	/** The app's catalogue from last time, so its buttons stay defined while it isn't running */
 	cachedCatalogue?: Catalogue | null
 	/** A catalogue arrived that differs from the one kept: keep this one for next time */
@@ -113,9 +116,15 @@ export class ControlAppMode {
 						canTakeOver: () => this.talkPage > 0,
 					})
 				: null
-		this.client = new ControlClient({ host: address, port: port || CONTROL_APPS[app].port, appName: this.name })
+		this.client = new ControlClient({
+			host: address,
+			port: port || CONTROL_APPS[app].port,
+			appName: this.name,
+			token: opts.token,
+		})
 		this.openCtx = {
 			app,
+			host: address,
 			running: () => this.client.status === 'ok' || this.client.status === 'not_allowed',
 			catalogue: () => this.catalogue,
 			press: async (control) => this.press(control),

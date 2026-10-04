@@ -19,21 +19,42 @@
 
 import { EventEmitter } from 'node:events'
 import type { LogLevel } from '@companion-module/base'
+import { hostPort, httpOrigin, isLoopback, netReason } from '../util/net.js'
 import { sseFrames } from '../util/sse.js'
+import { StreamWatchdog } from '../util/watchdog.js'
 import { CTL_API_VERSION } from './registry.js'
 import type { Catalogue, CmdResult, CmdValue, CtlInfo, StateValue } from './types.js'
 
-export type ControlStatus = 'connecting' | 'ok' | 'not_running' | 'not_allowed' | 'mismatch' | 'failure'
+/** `refused`: the app won't take this connection's token */
+export type ControlStatus = 'connecting' | 'ok' | 'not_running' | 'not_allowed' | 'mismatch' | 'failure' | 'refused'
 
 export interface ControlClientOptions {
 	host: string
 	port: number
 	/** used in status messages — "Pilot Tone Trigger isn't running" */
 	appName: string
+	/**
+	 * Sent as `Authorization: Bearer` on every request. The apps take
+	 * connections from their own Mac only today, which needs none; their
+	 * LAN access will (brief-companion-control.md §2.5, #106).
+	 */
+	token?: string
 	/** wait before reconnecting after a failure (default 2 s) */
 	retryMs?: number
-	/** wait before retrying an API version mismatch (default 10 s) */
+	/** wait before retrying an API version mismatch or a refused token (default 10 s) */
 	mismatchRetryMs?: number
+	/** per read, and for the stream's headers (default 5 s) */
+	requestTimeoutMs?: number
+	/**
+	 * per press (default 15 s). An app answers a press when its handler
+	 * returns, and MIDI Bridge's Restart can take over 5 s: a 3 s SIGTERM grace,
+	 * then up to 2 s after SIGKILL, then the start.
+	 */
+	cmdTimeoutMs?: number
+	/** a stream quiet this long gets its link checked (default 15 s; util/watchdog.ts) */
+	idleMs?: number
+	/** how often the watchdog looks (default 1 s) */
+	idleTickMs?: number
 }
 
 export interface ControlClientEvents {
@@ -70,6 +91,7 @@ export class ControlClient extends EventEmitter<ControlClientEvents> {
 	private started = false
 	private generation = 0
 	private streamAbort: AbortController | null = null
+	private watchdog: StreamWatchdog | null = null
 	private retryTimer: NodeJS.Timeout | null = null
 	private cidCounter = 0
 
@@ -78,8 +100,19 @@ export class ControlClient extends EventEmitter<ControlClientEvents> {
 	}
 
 	get baseUrl(): string {
-		const h = this.opts.host.includes(':') && !this.opts.host.startsWith('[') ? `[${this.opts.host}]` : this.opts.host
-		return `http://${h}:${this.opts.port}/ctl/v1`
+		return `${httpOrigin(this.opts.host, this.opts.port)}/ctl/v1`
+	}
+
+	private get where(): string {
+		return hostPort(this.opts.host, this.opts.port)
+	}
+
+	private headers(extra: Record<string, string> = {}): Record<string, string> {
+		return this.opts.token ? { ...extra, Authorization: `Bearer ${this.opts.token}` } : extra
+	}
+
+	private timeout(ms = this.opts.requestTimeoutMs ?? 5000): AbortSignal {
+		return AbortSignal.timeout(ms)
 	}
 
 	/** Current value of a state key; null when unknown. */
@@ -96,6 +129,7 @@ export class ControlClient extends EventEmitter<ControlClientEvents> {
 	stop(): void {
 		this.started = false
 		this.generation++
+		this.watchdog?.stop()
 		this.streamAbort?.abort()
 		this.streamAbort = null
 		if (this.retryTimer) clearTimeout(this.retryTimer)
@@ -111,15 +145,17 @@ export class ControlClient extends EventEmitter<ControlClientEvents> {
 		try {
 			res = await fetch(`${this.baseUrl}/cmd`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: this.headers({ 'Content-Type': 'application/json' }),
 				body: JSON.stringify(body),
+				signal: this.timeout(this.opts.cmdTimeoutMs ?? 15_000),
 			})
 		} catch (e) {
+			this.watchdog?.suspect() // a lost press: is the link still there?
 			return {
 				ok: false,
 				status: 0,
 				code: 'not_running',
-				message: `${this.opts.appName} isn't answering (${(e as Error).message})`,
+				message: `${this.opts.appName} isn't answering at ${this.where} (${netReason(e)})`,
 			}
 		}
 		let json: Record<string, unknown> = {}
@@ -150,7 +186,11 @@ export class ControlClient extends EventEmitter<ControlClientEvents> {
 				if (!this.live(gen)) return
 				if (e instanceof Resync) wait = 0
 				else if (e instanceof Mismatch) wait = this.opts.mismatchRetryMs ?? 10_000
-				else this.onError(e as Error)
+				else {
+					this.onError(e as Error)
+					// a refused token stays refused until someone changes it
+					if (this.status === 'refused') wait = this.opts.mismatchRetryMs ?? 10_000
+				}
 			}
 			if (!this.live(gen)) return
 			if (wait > 0) await new Promise<void>((r) => (this.retryTimer = setTimeout(r, wait)))
@@ -198,26 +238,51 @@ export class ControlClient extends EventEmitter<ControlClientEvents> {
 	private async consumeStream(gen: number): Promise<void> {
 		const abort = new AbortController()
 		this.streamAbort = abort
-		const res = await fetch(`${this.baseUrl}/stream`, {
-			headers: { 'Last-Event-ID': String(this.seq) },
-			signal: abort.signal,
-		})
+		// The stream has no timeout of its own, but its headers must still arrive.
+		const headersDue = setTimeout(() => abort.abort(new Error('no answer')), this.opts.requestTimeoutMs ?? 5000)
+		let res: Response
+		try {
+			res = await fetch(`${this.baseUrl}/stream`, {
+				headers: this.headers({ 'Last-Event-ID': String(this.seq) }),
+				signal: abort.signal,
+			})
+		} finally {
+			clearTimeout(headersDue)
+		}
 		if (res.status === 409) throw new Resync()
 		if (res.status !== 200 || !res.body) throw await httpError(res)
-		for await (const frame of sseFrames(res.body)) {
-			if (!this.live(gen)) return
-			const id = frame.id !== undefined && frame.id !== '' ? Number(frame.id) : undefined
-			if (id !== undefined) {
-				if (id <= this.floor) continue // already in the snapshot we started from
-				this.seq = id
+		// The apps send a keepalive every 10 s, so only a dead link (or a hung
+		// app) leaves this stream quiet long enough for the watchdog to ask.
+		const watchdog = new StreamWatchdog({
+			idleMs: this.opts.idleMs,
+			tickMs: this.opts.idleTickMs,
+			probe: async () => {
+				await fetch(`${this.baseUrl}/info`, { headers: this.headers(), signal: this.timeout() })
+				return true // any answer means the link is up
+			},
+			onDead: () => abort.abort(new Error('stopped answering')),
+		})
+		this.watchdog = watchdog
+		watchdog.start()
+		try {
+			for await (const frame of sseFrames(res.body, () => watchdog.feed())) {
+				if (!this.live(gen)) return
+				const id = frame.id !== undefined && frame.id !== '' ? Number(frame.id) : undefined
+				if (id !== undefined) {
+					if (id <= this.floor) continue // already in the snapshot we started from
+					this.seq = id
+				}
+				let payload: Record<string, unknown>
+				try {
+					payload = JSON.parse(frame.data) as Record<string, unknown>
+				} catch {
+					continue
+				}
+				await this.handleEvent(frame.event, payload)
 			}
-			let payload: Record<string, unknown>
-			try {
-				payload = JSON.parse(frame.data) as Record<string, unknown>
-			} catch {
-				continue
-			}
-			await this.handleEvent(frame.event, payload)
+		} finally {
+			watchdog.stop()
+			if (this.watchdog === watchdog) this.watchdog = null
 		}
 	}
 
@@ -263,13 +328,25 @@ export class ControlClient extends EventEmitter<ControlClientEvents> {
 	}
 
 	private onError(e: Error): void {
+		const name = this.opts.appName
 		if (e instanceof HttpError) {
-			this.setStatus('failure', `${this.opts.appName}: ${e.message}`)
+			// Control API v1 has no 401 of its own: it is the token, once the apps check one.
+			if (e.status === 401)
+				this.setStatus(
+					'refused',
+					`${name} refused this connection (${e.message}). Check the token in this connection's settings.`,
+				)
+			else this.setStatus('failure', `${name}: ${e.message}`)
 			return
 		}
 		// fetch() rejects with a TypeError whose cause is the socket error
-		const where = `${this.opts.host}:${this.opts.port}`
-		this.setStatus('not_running', `${this.opts.appName} isn't running — nothing is answering on ${where}`)
+		const reason = netReason(e)
+		this.setStatus(
+			'not_running',
+			reason === 'connection refused' && isLoopback(this.opts.host)
+				? `${name} isn't running — nothing is answering on ${this.where}`
+				: `${name} isn't answering at ${this.where} (${reason})`,
+		)
 	}
 
 	private setStatus(status: ControlStatus, message: string): void {
@@ -280,7 +357,7 @@ export class ControlClient extends EventEmitter<ControlClientEvents> {
 	}
 
 	private async getJson(path: string): Promise<Record<string, unknown>> {
-		const res = await fetch(this.baseUrl + path)
+		const res = await fetch(this.baseUrl + path, { headers: this.headers(), signal: this.timeout() })
 		if (res.status !== 200) throw await httpError(res)
 		return (await res.json()) as Record<string, unknown>
 	}

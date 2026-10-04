@@ -30,6 +30,17 @@ describe('Open <app>', () => {
 		expect(calls.logs).toEqual(["Talk Light Trigger isn't running. Start it on this Mac, then press again."])
 	})
 
+	it("names the Mac to start it on when the app isn't on this one (#106)", async () => {
+		const { ctx, calls } = context({ host: 'studio-mac.local' })
+		await openApp(ctx)
+		expect(calls.logs).toEqual([
+			"Talk Light Trigger isn't answering at studio-mac.local. Start it on that Mac, then press again.",
+		])
+		const local = context({ host: '127.0.0.1' })
+		await openApp(local.ctx)
+		expect(local.calls.logs).toEqual(["Talk Light Trigger isn't running. Start it on this Mac, then press again."])
+	})
+
 	it('asks a running app to show itself, when it offers a show control', async () => {
 		const { ctx, calls } = context({ running: () => true, catalogue: tlt })
 		await openApp(ctx)

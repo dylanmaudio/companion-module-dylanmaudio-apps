@@ -8,7 +8,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BridgeLink, deltaToEvent } from './bridgelink.js'
+import { BridgeLink, deltaToEvent, type BridgeLinkOptions } from './bridgelink.js'
 import { encode, toHex } from '../protocol/encode.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -34,6 +34,9 @@ interface Cmd {
 const queriesTo = (bridge: MockBridge): Record<string, unknown>[] =>
 	bridge.cmds.map((c) => c.body.intent as Record<string, unknown>).filter((intent) => intent?.op === 'query')
 
+const queriesOn = (bridge: MockBridge, lane: string): Record<string, unknown>[] =>
+	queriesTo({ cmds: bridge.cmds.filter((c) => c.body.lane_id === lane) } as MockBridge)
+
 class MockBridge {
 	server!: Server
 	port = 0
@@ -47,6 +50,15 @@ class MockBridge {
 	activeLanes = new Set<string>()
 	resyncNextStream = false
 	rejectCmdOnceWith: number | null = null
+	/** the error code that rejection carries (default: what a reaped lane gets) */
+	rejectCode: string | null = null
+	/** answer hello with this instead (a token the bridge won't take) */
+	refuseHello: { status: number; body: Record<string, unknown> } | null = null
+	cmdDelayMs = 0
+	infos = 0
+	/** a dead link: nothing is answered and nothing more reaches the stream, but nothing closes */
+	frozen = false
+	private held: ServerResponse[] = []
 	private sse: ServerResponse | null = null
 
 	async start(): Promise<void> {
@@ -59,9 +71,11 @@ class MockBridge {
 	stop(): void {
 		this.sse?.end()
 		this.server.close()
+		this.server.closeAllConnections()
 	}
 
 	pushEvent(kind: string, payload: Record<string, unknown>): void {
+		if (this.frozen) return
 		this.seq++
 		const enriched = { v: 1, session: 'main', seq: this.seq, ts: Date.now(), ...payload }
 		this.sse?.write(`id: ${this.seq}\nevent: ${kind}\ndata: ${JSON.stringify(enriched)}\n\n`)
@@ -79,11 +93,16 @@ class MockBridge {
 	private async route(req: IncomingMessage, res: ServerResponse): Promise<void> {
 		const url = new URL(req.url ?? '/', 'http://x')
 		const body = await readBody(req)
+		if (this.frozen) {
+			this.held.push(res)
+			return
+		}
 		const send = (status: number, obj: unknown) => {
 			res.writeHead(status, { 'Content-Type': 'application/json' })
 			res.end(JSON.stringify(obj))
 		}
 		if (url.pathname === '/api/v1/info') {
+			this.infos++
 			send(200, {
 				v: 1,
 				session: 'main',
@@ -96,6 +115,10 @@ class MockBridge {
 		}
 		if (url.pathname === '/api/v1/hello') {
 			this.hellos.push(body)
+			if (this.refuseHello) {
+				send(this.refuseHello.status, this.refuseHello.body)
+				return
+			}
 			const laneId = `ln_${String(++this.laneCounter).padStart(4, '0')}`
 			this.activeLanes.add(laneId)
 			send(200, { v: 1, session: 'main', lane_id: laneId, capabilities: { raw: true }, seq: this.seq })
@@ -117,6 +140,7 @@ class MockBridge {
 				return
 			}
 			res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+			res.flushHeaders() // as the bridge does: end_headers() on an unbuffered handler
 			this.sse = res
 			res.on('close', () => {
 				if (this.sse === res) this.sse = null
@@ -124,10 +148,12 @@ class MockBridge {
 			return
 		}
 		if (url.pathname === '/api/v1/cmd') {
+			if (this.cmdDelayMs) await new Promise((r) => setTimeout(r, this.cmdDelayMs))
 			if (this.rejectCmdOnceWith !== null) {
 				const status = this.rejectCmdOnceWith
 				this.rejectCmdOnceWith = null
-				send(status, { ok: false, error: { code: status === 401 ? 'unknown_lane' : 'capability_off' } })
+				const code = this.rejectCode ?? (status === 401 ? 'unknown_lane' : 'capability_off')
+				send(status, { ok: false, error: { code } })
 				return
 			}
 			if (!this.activeLanes.has(String(body.lane_id))) {
@@ -402,6 +428,134 @@ describe('BridgeLink', () => {
 		await waitFor(() => bridge.cmds.length >= 1, 'retried cmd')
 		expect(bridge.hellos.length).toBe(2)
 		expect((bridge.cmds[0].body.intent as { index: number }).index).toBe(4)
+	})
+
+	describe('across a network (#106)', () => {
+		let watched: BridgeLink | null = null
+		afterEach(() => watched?.stop())
+
+		/** Short timings: answers within 200 ms, a quiet stream checked after 300 ms */
+		const quick = (extra: Partial<BridgeLinkOptions> = {}): BridgeLink =>
+			new BridgeLink({
+				host: '127.0.0.1',
+				port: bridge.port,
+				laneName: 'watched',
+				baseChannel: 12,
+				retryMs: 50,
+				requestTimeoutMs: 200,
+				idleMs: 300,
+				idleTickMs: 20,
+				...extra,
+			})
+
+		it('a dead link ends the session within the watchdog time, and the desk stops reading as answering', async () => {
+			link.stop()
+			const w = (watched = quick())
+			const statuses: string[] = []
+			const changedPaths: string[] = []
+			w.on('status', (s, m) => statuses.push(`${s} ${m ?? ''}`))
+			w.on('changed', (p) => changedPaths.push(...p))
+			w.start()
+			await waitFor(() => w.isOk, 'ok')
+			expect(w.state.connected).toBe(true)
+			bridge.frozen = true
+			const t0 = Date.now()
+			await waitFor(() => !w.isOk, 'noticed', 3000)
+			// quiet for 300 ms, then a question that gets no answer in 200 ms
+			expect(Date.now() - t0).toBeLessThan(1500)
+			expect(statuses).toContainEqual(
+				expect.stringMatching(/^connecting Waiting for MIDI Bridge at 127\.0\.0\.1:\d+ \(stopped answering\)$/),
+			)
+			expect(w.state.connected).toBe(false)
+			expect(changedPaths).toContain('connection')
+		})
+
+		it('a quiet bridge that still answers keeps its session', async () => {
+			link.stop()
+			const w = (watched = quick({ idleMs: 100 }))
+			w.start()
+			await waitFor(() => w.isOk, 'ok')
+			const infosBefore = bridge.infos
+			await new Promise((r) => setTimeout(r, 600))
+			expect(bridge.infos).toBeGreaterThan(infosBefore) // the watchdog asked,
+			expect(w.isOk).toBe(true) // was answered,
+			expect(bridge.hellos.length).toBe(1) // and never reconnected
+		})
+
+		it('a lost press is a warning, and the link is checked at once rather than after the quiet', async () => {
+			link.stop()
+			const w = (watched = quick({ idleMs: 60_000 }))
+			const warns: string[] = []
+			w.on('log', (level, m) => {
+				if (level === 'warn') warns.push(m)
+			})
+			w.start()
+			await waitFor(() => w.isOk, 'ok')
+			bridge.frozen = true
+			w.send({ op: 'mute', type: 'input', index: 3, on: true })
+			await waitFor(() => !w.isOk, 'noticed', 3000)
+			expect(warns).toContain("mute didn't reach MIDI Bridge (no answer)")
+		})
+
+		it('says so when the bridge refuses the token, and asks again slowly', async () => {
+			link.stop()
+			bridge.refuseHello = { status: 401, body: { ok: false, error: { code: 'bad_token', message: 'Token required' } } }
+			const w = (watched = quick({ refusedRetryMs: 10_000 }))
+			const statuses: [string, string | undefined][] = []
+			w.on('status', (s, m) => statuses.push([s, m]))
+			w.start()
+			await waitFor(() => w.status === 'refused', 'refused')
+			expect(statuses.at(-1)?.[1]).toBe(
+				"MIDI Bridge refused this connection (Token required). Check the bridge token in this connection's settings.",
+			)
+			await new Promise((r) => setTimeout(r, 300))
+			expect(bridge.hellos.length).toBe(1)
+		})
+
+		it('a 401 on a command that is not a reaped lane does not re-register', async () => {
+			link.start()
+			await waitFor(() => link.isOk, 'ok')
+			bridge.rejectCmdOnceWith = 401
+			bridge.rejectCode = 'bad_token'
+			link.send({ op: 'mute', type: 'input', index: 4, on: true })
+			await waitFor(() => logs.some((l) => l.includes('bad_token')), 'rejection logged')
+			expect(bridge.hellos.length).toBe(1)
+		})
+
+		it('a cold sync from an ended session stops asking', async () => {
+			link.stop()
+			const strips = Array.from({ length: 60 }, (_, i) => ({ type: 'input' as const, index: i + 1 }))
+			bridge.cmdDelayMs = 15
+			const w = (watched = quick({ strips, syncScope: 'names' }))
+			w.start()
+			await waitFor(() => queriesTo(bridge).length >= 8, 'first sync under way')
+			bridge.sseClose() // the session ends mid-sync; the next one syncs again
+			await waitFor(() => bridge.hellos.length === 2, 'second session')
+			await waitFor(() => queriesOn(bridge, 'ln_0002').length >= 60, 'second sync done', 4000)
+			await new Promise((r) => setTimeout(r, 200))
+			// every strip asked once on the new lane: none of the old sync's leftovers
+			expect(queriesOn(bridge, 'ln_0002').length).toBe(60)
+			expect(queriesOn(bridge, 'ln_0001').length).toBeLessThan(60)
+			expect(bridge.hellos.length).toBe(2)
+		})
+
+		it('brackets an IPv6 address', () => {
+			link.stop()
+			const w = (watched = new BridgeLink({ host: '::1', port: 8765, laneName: 'v6', baseChannel: 12 }))
+			const statuses: (string | undefined)[] = []
+			w.on('status', (_s, m) => statuses.push(m))
+			w.start()
+			expect(statuses[0]).toBe('Waiting for MIDI Bridge at [::1]:8765')
+		})
+	})
+
+	it('when the bridge goes away, the desk stops reading as answering', async () => {
+		link.start()
+		await waitFor(() => link.isOk && link.state.connected, 'ok')
+		bridge.stop()
+		await waitFor(() => !link.isOk, 'noticed')
+		expect(link.state.connected).toBe(false)
+		expect(changes.flat()).toContain('connection')
 	})
 
 	it('deltaToEvent rejects junk honestly', () => {
