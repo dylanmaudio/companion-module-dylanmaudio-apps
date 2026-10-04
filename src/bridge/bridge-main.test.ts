@@ -63,10 +63,17 @@ describe('bridge mode through DliveInstance', () => {
 	let server: Server
 	let port = 0
 	const cmds: Record<string, unknown>[] = []
+	/**
+	 * Each request's path and Authorization header, per server: a request the
+	 * last test's link already had in flight still reaches the last test's server.
+	 */
+	let auth: [string, string | undefined][] = []
 
 	beforeEach(async () => {
 		cmds.length = 0
+		const seen: typeof auth = (auth = [])
 		server = createServer((req, res) => {
+			seen.push([req.url ?? '', req.headers.authorization])
 			let data = ''
 			req.on('data', (c: Buffer) => (data += c.toString()))
 			req.on('end', () => {
@@ -84,7 +91,11 @@ describe('bridge mode through DliveInstance', () => {
 						seq: 5,
 						state: { 'connection.console': 'connected', 'input.7.fader': { lv: 101, db: -3.1 } },
 					})
-				if (p === '/api/v1/stream') return res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+				if (p === '/api/v1/stream') {
+					// headers go at once, as the bridge's end_headers() sends them
+					res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+					return res.flushHeaders()
+				}
 				if (p === '/api/v1/cmd') {
 					cmds.push(JSON.parse(data) as Record<string, unknown>)
 					return send(200, { ok: true })
@@ -149,6 +160,37 @@ describe('bridge mode through DliveInstance', () => {
 		expect(host.actions).toHaveProperty('ctl_bridge__restart')
 		await waitFor(() => host.vars.bridge_state === 'stopped', 'bridge state variable')
 		await waitFor(() => inst.link.isOk, 'console link still ok')
+		await inst.destroy()
+		await ctl.stop()
+	})
+
+	it('sends the bridge token from the secrets store to both of the bridge’s ports', async () => {
+		const ctl = new CtlMock(load('bridge.json'))
+		await ctl.start()
+		const host = new Host()
+		const inst = new DliveInstance(host.context)
+		await inst.init(
+			{ ...DEFAULT_CONFIG, bridgeHost: '127.0.0.1', bridgePort: port, bridgeCtlPort: ctl.port, inputs: 16 },
+			false,
+			{ bridgeToken: ' tok-1 ', ctlToken: 'not-this-one' },
+		)
+		await waitFor(() => inst.link.isOk && ctl.requests.some((r) => r.path === '/ctl/v1/stream'), 'both up')
+		await waitFor(() => auth.some(([path]) => path === '/api/v1/cmd'), 'the cold sync asking')
+		for (const kind of ['/api/v1/info', '/api/v1/hello', '/api/v1/state', '/api/v1/stream', '/api/v1/cmd'])
+			expect(
+				auth.some(([path]) => path.startsWith(kind)),
+				kind,
+			).toBe(true)
+		for (const [path, a] of auth) expect(a, path).toBe('Bearer tok-1')
+		for (const r of ctl.requests) expect(r.headers.authorization, r.path).toBe('Bearer tok-1')
+
+		// a new token reconnects both, with it
+		await inst.configUpdated({ ...inst.config }, { bridgeToken: 'tok-2', ctlToken: '' })
+		await waitFor(() => auth.some(([, a]) => a === 'Bearer tok-2'), 'Client API reconnected')
+		await waitFor(
+			() => ctl.requests.some((r) => r.headers.authorization === 'Bearer tok-2'),
+			'control port reconnected',
+		)
 		await inst.destroy()
 		await ctl.stop()
 	})

@@ -18,6 +18,7 @@
 import { EventEmitter } from 'node:events'
 import type { CompanionVariableValues, InstanceBase, LogLevel } from '@companion-module/base'
 import type { ModuleSchema } from '../main.js'
+import { hostPort } from '../util/net.js'
 import { ControlClient, type ControlStatus } from './client.js'
 import {
 	buildControlActions,
@@ -65,6 +66,8 @@ export class BridgeAppControl extends EventEmitter<BridgeAppEvents> {
 		port: number,
 		opts: {
 			retryMs?: number
+			/** The bridge token: for the LAN access the bridge will grow (#106) */
+			token?: string
 			/** The bridge's catalogue from last time: Run and Restart stay defined while the app is down */
 			cached?: Catalogue | null
 			/** A catalogue arrived that differs from the one kept: keep this one for next time */
@@ -74,12 +77,13 @@ export class BridgeAppControl extends EventEmitter<BridgeAppEvents> {
 		super()
 		const { cached, onCatalogue, ...clientOpts } = opts
 		const p = port || CONTROL_APPS.bridge.port
-		this.where = `${address}:${p}`
+		this.where = hostPort(address, p)
 		this.catalogue = cached?.app === 'bridge' ? cached : null
 		let keptHash = this.catalogue?.hash
 		this.client = new ControlClient({ host: address, port: p, appName: CONTROL_APPS.bridge.name, ...clientOpts })
 		this.openCtx = {
 			app: 'bridge',
+			host: address,
 			running: () => this.reporting(),
 			catalogue: () => this.catalogue,
 			press: async (control) => this.press(control),

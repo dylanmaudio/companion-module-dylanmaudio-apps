@@ -10,7 +10,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ANY_STR, CtlMock, FILES, load, waitFor } from '../../test/ctlmock.js'
-import { ControlClient } from './client.js'
+import { ControlClient, type ControlClientOptions } from './client.js'
 import type { CmdValue } from './types.js'
 
 const demo = load('exchanges.json')
@@ -189,6 +189,114 @@ for (const file of FILES) {
 		})
 	})
 }
+
+describe('ControlClient across a network (#106)', () => {
+	let mock: CtlMock
+	let client: ControlClient | null = null
+	const streaming = (c: ControlClient) => c.status === 'ok' && mock.requests.some((r) => r.path === '/ctl/v1/stream')
+
+	beforeEach(async () => {
+		mock = new CtlMock(ptt)
+		await mock.start()
+	})
+	afterEach(async () => {
+		client?.stop()
+		client = null
+		await mock.stop()
+	})
+
+	/** Short timings: answers within 200 ms, a quiet stream checked after 300 ms */
+	const quick = (extra: Partial<ControlClientOptions> = {}): ControlClient =>
+		(client = new ControlClient({
+			host: '127.0.0.1',
+			port: mock.port,
+			appName: 'Pilot Tone Trigger',
+			retryMs: 30,
+			mismatchRetryMs: 30,
+			requestTimeoutMs: 200,
+			cmdTimeoutMs: 200,
+			idleMs: 300,
+			idleTickMs: 20,
+			...extra,
+		}))
+
+	it('sends the token on every request', async () => {
+		const c = quick({ token: 's3cret' })
+		c.start()
+		await waitFor(() => streaming(c), 'stream')
+		await c.cmd('ptt.failback_mode', 'latch')
+		expect(mock.requests.map((r) => r.path)).toEqual(
+			expect.arrayContaining(['/ctl/v1/info', '/ctl/v1/catalogue', '/ctl/v1/state', '/ctl/v1/stream', '/ctl/v1/cmd']),
+		)
+		for (const r of mock.requests) expect(r.headers.authorization, r.path).toBe('Bearer s3cret')
+	})
+
+	it('sends no Authorization without a token', async () => {
+		const c = quick()
+		c.start()
+		await waitFor(() => streaming(c), 'stream')
+		for (const r of mock.requests) expect(r.headers.authorization, r.path).toBeUndefined()
+	})
+
+	it('a dead link reads as not answering within the watchdog time, not after TCP gives up', async () => {
+		const c = quick()
+		c.start()
+		await waitFor(() => streaming(c), 'stream')
+		mock.frozen = true
+		const t0 = Date.now()
+		await waitFor(() => c.status === 'not_running', 'noticed', 3000)
+		expect(Date.now() - t0).toBeLessThan(1500)
+		expect(c.statusMessage).toMatch(
+			/^Pilot Tone Trigger isn't answering at 127\.0\.0\.1:\d+ \((stopped answering|no answer)\)$/,
+		)
+	})
+
+	it('a lost press checks the link at once', async () => {
+		const c = quick({ idleMs: 60_000 })
+		c.start()
+		await waitFor(() => streaming(c), 'stream')
+		mock.frozen = true
+		const r = await c.cmd('ptt.failback_mode', 'latch')
+		expect(r).toMatchObject({ ok: false, code: 'not_running' })
+		expect(r.message).toMatch(/^Pilot Tone Trigger isn't answering at 127\.0\.0\.1:\d+ \(no answer\)$/)
+		await waitFor(() => c.status === 'not_running', 'noticed', 2000)
+	})
+
+	it('a slow press is waited for: a handler may take longer than a read', async () => {
+		const c = quick({ requestTimeoutMs: 100, cmdTimeoutMs: 2000 })
+		c.start()
+		await waitFor(() => streaming(c), 'stream')
+		mock.cmdDelayMs = 400 // MIDI Bridge's Restart can block for seconds
+		const r = await c.cmd('ptt.failback_mode', 'latch')
+		expect(r.code).not.toBe('not_running')
+		expect(c.status).toBe('ok')
+	})
+
+	it('a refused token says so, and is asked about again slowly', async () => {
+		mock.refuse = 'Token required'
+		const c = quick({ mismatchRetryMs: 10_000 })
+		c.start()
+		await waitFor(() => c.status === 'refused', 'refused')
+		expect(c.statusMessage).toBe(
+			"Pilot Tone Trigger refused this connection (Token required). Check the token in this connection's settings.",
+		)
+		const asked = mock.requests.length
+		await new Promise((r) => setTimeout(r, 300))
+		expect(mock.requests.length).toBe(asked)
+	})
+
+	it("doesn't call an app on another machine 'not running' when it can't be reached", async () => {
+		const c = (client = new ControlClient({
+			host: 'no-such-host.invalid',
+			port: 8772,
+			appName: 'Pilot Tone Trigger',
+			retryMs: 30,
+		}))
+		c.start()
+		await waitFor(() => c.status === 'not_running', 'status')
+		expect(c.statusMessage).toBe("Pilot Tone Trigger isn't answering at no-such-host.invalid:8772 (address not found)")
+	})
+})
 
 describe('fixtures/control', () => {
 	it('has the demo contract and all five apps', () => {

@@ -32,6 +32,8 @@ fixtures/api/           Client API exchange fixtures (authored bridge-side, vend
 fixtures/control/       control API exchange fixtures for the other apps (authored in the monorepo, vendored here)
 src/control/            the other apps: /ctl/v1/ client, and catalogue → actions, feedbacks, variables, presets
 src/util/sse.ts         Server-Sent Events framing
+src/util/watchdog.ts    notices a stream gone quiet because the link under it died (#106)
+src/util/net.ts         addresses and network failures, said the same way by both clients
 src/transport/          test harness only: ConsoleTransport, TcpTransport, FakeTransport
 src/link.ts             test harness only: ConsoleLink — codec + state + scheduler + probe + fades
 src/fades.ts            dB-linear emit-on-change ramps

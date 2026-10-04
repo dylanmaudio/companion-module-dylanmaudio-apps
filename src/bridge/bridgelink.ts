@@ -27,6 +27,8 @@ import { ConsoleState, CONNECTION_PATH } from '../state/model.js'
 import { SubscriptionRegistry } from '../state/subscriptions.js'
 import type { LinkApi, LinkDiag, LinkEvents, LinkStatus, SyncScope } from '../link-api.js'
 import { localEvent } from '../protocol/localevent.js'
+import { hostPort, httpOrigin, netReason } from '../util/net.js'
+import { StreamWatchdog } from '../util/watchdog.js'
 
 /** Ops the shipped v1.1 bridge encodes first-class (everything else → raw). */
 const FIRST_CLASS = new Set([
@@ -71,7 +73,47 @@ export interface BridgeLinkOptions {
 	/** how much of each strip to ask for; 'none' asks for nothing */
 	syncScope?: SyncScope
 	retryMs?: number
+	/** wait before asking again after the bridge refused this connection (default 10 s) */
+	refusedRetryMs?: number
+	/** per request (default 5 s) */
+	requestTimeoutMs?: number
+	/** a stream quiet this long gets its link checked (default 15 s; util/watchdog.ts) */
+	idleMs?: number
+	/** how often the watchdog looks (default 1 s) */
+	idleTickMs?: number
 	now?: () => number
+}
+
+/**
+ * The bridge said no to this connection: a token it won't take, or an
+ * address it won't serve. Retrying quickly can't change that.
+ */
+class Refused extends Error {}
+
+/** The stream's cursor fell off the bridge's event ring. */
+class Resync extends Error {}
+
+function errorOf(json: Record<string, unknown>): { code?: string; message?: string } {
+	const e = json.error
+	if (typeof e !== 'object' || e === null) return {}
+	const { code, message } = e as { code?: unknown; message?: unknown }
+	return {
+		code: typeof code === 'string' ? code : undefined,
+		message: typeof message === 'string' ? message : undefined,
+	}
+}
+
+/**
+ * 401 or 403 outside /cmd is the bridge refusing this connection. API v1
+ * has neither today (its one 401 is a reaped lane, on /cmd). The LAN mode
+ * (spec §4, #106) gates requests with a token, and #105 refuses some hosts.
+ */
+function refusal(status: number, json: Record<string, unknown>): Refused | null {
+	if (status !== 401 && status !== 403) return null
+	const { code, message } = errorOf(json)
+	return new Refused(
+		`MIDI Bridge refused this connection (${message ?? code ?? `HTTP ${status}`}). Check the bridge token in this connection's settings.`,
+	)
 }
 
 interface BridgeCaps {
@@ -94,7 +136,10 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	private consoleState: string | undefined
 	private seq = -1
 	private cidCounter = 0
+	/** Counts sessions (one hello each), so a cold sync from an ended one stops asking */
+	private session = 0
 	private streamAbort: AbortController | null = null
+	private watchdog: StreamWatchdog | null = null
 	private retryTimer: NodeJS.Timeout | null = null
 	private generation = 0
 	private unsupportedOps = new Set<string>()
@@ -122,8 +167,12 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	start(): void {
 		if (this.started) return
 		this.started = true
-		this.setStatus('connecting', `Waiting for MIDI Bridge at ${this.opts.host}:${this.opts.port}`)
+		this.setStatus('connecting', `Waiting for MIDI Bridge at ${this.where}`)
 		void this.runSession(++this.generation)
+	}
+
+	private get where(): string {
+		return hostPort(this.opts.host, this.opts.port)
 	}
 
 	stop(): void {
@@ -131,6 +180,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		this.generation++
 		if (this.retryTimer) clearTimeout(this.retryTimer)
 		this.retryTimer = null
+		this.watchdog?.stop()
 		this.streamAbort?.abort()
 		this.streamAbort = null
 		if (this.laneId) {
@@ -199,9 +249,10 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	}
 
 	sync(scope: SyncScope): void {
+		const session = this.session
 		void (async () => {
 			await this.refetchState('resync requested')
-			await this.coldSync(scope, 'resync')
+			await this.coldSync(scope, 'resync', session)
 		})()
 	}
 
@@ -216,7 +267,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	// ------------------------------------------------------------ HTTP plumbing
 
 	private baseUrl(): string {
-		return `http://${this.opts.host}:${this.opts.port}`
+		return httpOrigin(this.opts.host, this.opts.port)
 	}
 
 	private headers(): Record<string, string> {
@@ -234,7 +285,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			method,
 			headers: this.headers(),
 			body: body === undefined ? undefined : JSON.stringify(body),
-			signal: AbortSignal.timeout(5000),
+			signal: AbortSignal.timeout(this.opts.requestTimeoutMs ?? 5000),
 		})
 		let json: Record<string, unknown> = {}
 		try {
@@ -250,36 +301,40 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	}
 
 	private async postCmd(intentObj: Record<string, unknown>): Promise<void> {
+		const op = String(intentObj.op)
+		if (!this.laneId) {
+			// the session ended (a cold sync or fade still running): the next one starts afresh
+			this.emit('log', 'debug', `Bridge lane not up; dropped ${op}`)
+			return
+		}
 		const cid = this.nextCid()
+		const envelope = () => ({ v: 1, session: 'main', lane_id: this.laneId, cid, intent: intentObj })
 		try {
-			const { status, json } = await this.http('POST', '/api/v1/cmd', {
-				v: 1,
-				session: 'main',
-				lane_id: this.laneId,
-				cid,
-				intent: intentObj,
-			})
+			let { status, json } = await this.http('POST', '/api/v1/cmd', envelope())
 			this.stats.cmdsSent++
-			if (status === 401) {
+			if (status === 401 && errorOf(json).code === 'unknown_lane') {
 				// lane reaped — re-hello and retry once
 				this.emit('log', 'debug', 'Bridge lane expired; re-registering')
 				await this.hello()
-				await this.http('POST', '/api/v1/cmd', { v: 1, session: 'main', lane_id: this.laneId, cid, intent: intentObj })
-				return
+				;({ status, json } = await this.http('POST', '/api/v1/cmd', envelope()))
 			}
 			if (json.ok === false) {
 				this.stats.cmdsFailed++
-				const err = (json.error ?? {}) as { code?: string; message?: string }
+				const err = errorOf(json)
 				const level = err.code === 'capability_off' || err.code === 'unsupported_op' ? 'info' : 'warn'
-				this.emit(
-					'log',
-					level,
-					`Bridge rejected ${String(intentObj.op)}: ${err.code ?? status}${err.message ? ` (${err.message})` : ''}`,
-				)
+				this.emit('log', level, `Bridge rejected ${op}: ${err.code ?? status}${err.message ? ` (${err.message})` : ''}`)
 			}
 		} catch (e) {
 			this.stats.cmdsFailed++
-			this.emit('log', 'debug', `cmd ${String(intentObj.op)} failed: ${(e as Error).message}`)
+			if (e instanceof Refused) {
+				// the token stopped working mid-session: end it, and the reconnect says so
+				this.streamAbort?.abort(e)
+				return
+			}
+			// A lost press matters, and may mean the link is down. A lost cold-sync
+			// query is asked again by the next session's cold sync.
+			if (op !== 'query') this.watchdog?.suspect()
+			this.emit('log', op === 'query' ? 'debug' : 'warn', `${op} didn't reach MIDI Bridge (${netReason(e)})`)
 		}
 	}
 
@@ -311,24 +366,40 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 
 	private async runSession(gen: number): Promise<void> {
 		while (this.started && gen === this.generation) {
+			let wait = this.opts.retryMs ?? 2000
 			try {
 				await this.connectOnce(gen)
 			} catch (e) {
 				if (!this.started || gen !== this.generation) return
 				this.laneId = null
-				this.setStatus(
-					'connecting',
-					`Waiting for MIDI Bridge at ${this.opts.host}:${this.opts.port} (${(e as Error).message})`,
-				)
+				// A resync is the bridge still answering: the desk hasn't gone anywhere.
+				if (!(e instanceof Resync)) this.consoleUnknown()
+				if (e instanceof Refused) {
+					this.setStatus('refused', e.message)
+					wait = this.opts.refusedRetryMs ?? 10_000
+				} else this.setStatus('connecting', `Waiting for MIDI Bridge at ${this.where} (${netReason(e)})`)
 			}
 			if (!this.started || gen !== this.generation) return
-			await new Promise((r) => (this.retryTimer = setTimeout(r, this.opts.retryMs ?? 2000)))
+			await new Promise((r) => (this.retryTimer = setTimeout(r, wait)))
 		}
 	}
 
+	/**
+	 * The session ended, so nothing says the console is answering any more.
+	 * Without this, "Console is answering" stayed lit while the bridge was gone.
+	 */
+	private consoleUnknown(): void {
+		if (!this.state.connected) return
+		this.state.connected = false
+		this.emit('changed', [CONNECTION_PATH])
+	}
+
 	private async connectOnce(gen: number): Promise<void> {
+		const session = ++this.session
 		// 1. info: adopt the bridge's base channel + capabilities
 		const info = await this.http('GET', '/api/v1/info')
+		const refused = refusal(info.status, info.json)
+		if (refused) throw refused
 		if (info.status !== 200) throw new Error(`info ${info.status}`)
 		const base = Number(info.json.base_channel)
 		if (Number.isInteger(base) && base >= 1 && base <= 16) {
@@ -353,7 +424,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		this.applyConsoleState()
 
 		// 4. the cold sync itself, in the background: the stream matters more
-		void this.coldSync(this.opts.syncScope ?? 'names_state', 'connect')
+		void this.coldSync(this.opts.syncScope ?? 'names_state', 'connect', session)
 
 		// 5. stream (returns on drop; throws on resync/other errors)
 		await this.consumeStream(gen)
@@ -366,7 +437,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	 * lane that joins mid-show sees nothing until someone moves something —
 	 * names and colours above all. Results arrive as ordinary deltas.
 	 */
-	private async coldSync(scope: SyncScope, why: string): Promise<void> {
+	private async coldSync(scope: SyncScope, why: string, session: number): Promise<void> {
 		if (scope === 'none') return
 		const wide = scope !== 'names'
 		const jobs = (this.opts.strips ?? []).map(({ type, index }) => {
@@ -379,6 +450,8 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		let next = 0
 		const lane = async (): Promise<void> => {
 			for (let i = next++; i < jobs.length; i = next++) {
+				// that session ended; the next one runs its own cold sync
+				if (session !== this.session || !this.laneId) return
 				const job = jobs[i]
 				await this.postCmd({ op: 'query', type: job.type, index: job.index, fields: job.fields })
 			}
@@ -394,12 +467,16 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			name: this.opts.laneName,
 			kind: 'companion',
 		})
+		const refused = refusal(res.status, res.json)
+		if (refused) throw refused
 		if (res.status !== 200) throw new Error(`hello ${res.status}`)
 		this.laneId = String(res.json.lane_id)
 	}
 
 	private async refetchState(why: string): Promise<void> {
 		const res = await this.http('GET', '/api/v1/state')
+		const refused = refusal(res.status, res.json)
+		if (refused) throw refused
 		if (res.status !== 200) throw new Error(`state ${res.status}`)
 		this.seq = Number(res.json.seq ?? -1)
 		const snapshot = (res.json.state ?? {}) as Record<string, unknown>
@@ -438,31 +515,67 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	private async consumeStream(gen: number): Promise<void> {
 		const abort = new AbortController()
 		this.streamAbort = abort
-		const res = await fetch(`${this.baseUrl()}/api/v1/stream`, {
-			headers: { ...this.headers(), 'Last-Event-ID': String(this.seq) },
-			signal: abort.signal,
-		})
+		// The stream has no timeout of its own, but its headers must still arrive.
+		const headersDue = setTimeout(() => abort.abort(new Error('no answer')), this.opts.requestTimeoutMs ?? 5000)
+		let res: Response
+		try {
+			res = await fetch(`${this.baseUrl()}/api/v1/stream`, {
+				headers: { ...this.headers(), 'Last-Event-ID': String(this.seq) },
+				signal: abort.signal,
+			})
+		} finally {
+			clearTimeout(headersDue)
+		}
 		if (res.status === 409) {
 			this.stats.resyncs++
 			await this.refetchState('event ring resync')
 			this.applyConsoleState()
-			throw new Error('resync')
+			throw new Resync('resync')
+		}
+		if (res.status === 401 || res.status === 403) {
+			let json: Record<string, unknown> = {}
+			try {
+				json = (await res.json()) as Record<string, unknown>
+			} catch {
+				/* non-JSON body */
+			}
+			const refused = refusal(res.status, json)
+			if (refused) throw refused
 		}
 		if (res.status !== 200 || !res.body) throw new Error(`stream ${res.status}`)
 
-		const reader = res.body.getReader()
-		const decoder = new TextDecoder()
-		let buf = ''
-		for (;;) {
-			const { value, done } = await reader.read()
-			if (done || !this.started || gen !== this.generation) return
-			buf += decoder.decode(value, { stream: true })
-			let idx: number
-			while ((idx = buf.indexOf('\n\n')) >= 0) {
-				const frame = buf.slice(0, idx)
-				buf = buf.slice(idx + 2)
-				this.handleFrame(frame)
+		// API v1's stream carries no keepalives: a quiet desk and a dead link
+		// look alike from here, so the watchdog asks when it's been quiet.
+		const watchdog = new StreamWatchdog({
+			idleMs: this.opts.idleMs,
+			tickMs: this.opts.idleTickMs,
+			probe: async () => {
+				await this.http('GET', '/api/v1/info') // any answer means the link is up
+				return true
+			},
+			onDead: () => abort.abort(new Error('stopped answering')),
+		})
+		this.watchdog = watchdog
+		watchdog.start()
+		try {
+			const reader = res.body.getReader()
+			const decoder = new TextDecoder()
+			let buf = ''
+			for (;;) {
+				const { value, done } = await reader.read()
+				if (done || !this.started || gen !== this.generation) return
+				watchdog.feed()
+				buf += decoder.decode(value, { stream: true })
+				let idx: number
+				while ((idx = buf.indexOf('\n\n')) >= 0) {
+					const frame = buf.slice(0, idx)
+					buf = buf.slice(idx + 2)
+					this.handleFrame(frame)
+				}
 			}
+		} finally {
+			watchdog.stop()
+			if (this.watchdog === watchdog) this.watchdog = null
 		}
 	}
 

@@ -68,6 +68,8 @@ here without a new version of this module.
   label is the variable prefix: `$(ptt:state)`, `$(tct:timecode)`.
 - **Port 0** uses the app's standard port (Talk Light 8771, Pilot Tone
   8772, Time Code Tool 8773, Console Control 8774).
+- **Leave the App token empty.** The apps accept connections from their
+  own Mac only, for now; the field is for the LAN access they will grow.
 - **Show-critical controls** — stopping an app, changing Pilot Tone's
   failback mode — are refused while the app's _Lock show-critical
   controls_ switch is on. The action says so in its description.
@@ -175,22 +177,22 @@ preset, and the variables `$(tlt:talk_active)`, `$(tlt:talk_flash_armed)`,
 
 ## Connection settings
 
-| Setting                                       | Notes                                                                                                                                                                                                 |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| App                                           | Which dylanmaudio app this connection controls. **MIDI Bridge** is the dLive console, and everything below; the others are covered above                                                              |
-| Talk flash rate / cooldown / TALK page number | Talk Light only — see _Talk flash_ above                                                                                                                                                              |
-| MIDI Bridge address / port / token            | Where the bridge is: 127.0.0.1 : 8765, beside Companion. The bridge listens on its own Mac, so the token stays empty until it grows LAN access                                                        |
-| Bridge app control port                       | 0 = the standard 8770, on the same address. For Run, Restart and Auto-reconnect (MIDI Bridge 1.1.9+)                                                                                                  |
-| Console firmware                              | Not detectable over MIDI; shown in `$(dlive:firmware)`                                                                                                                                                |
-| Inputs in use / extended types                | Bounds the variable grid and the preset library                                                                                                                                                       |
-| Ask the console for                           | What the bridge fetches for every strip on connect, and on **Resync**. The desk announces only what _changes_, so without this a connection made mid-show shows nothing until someone moves something |
-| Scene Go / Next / Previous                    | The CC number + value you assigned on the console. 0/0 = not assigned                                                                                                                                 |
-| Console Actions map                           | `cc,value,Name` per line. Optional when a firmware 2.1x show file is loaded — Actions import automatically; manual lines win on the same CC/value                                                     |
-| Show file                                     | Loaded on the connection's own **show file page**, not here — see below                                                                                                                               |
-| Show file path (advanced)                     | Only useful when the file sits somewhere this sandboxed module can read. An uploaded show wins over it                                                                                                |
-| Scene names (manual)                          | `scene,Name` per line; overrides the show file                                                                                                                                                        |
-| Show send levels in dB                        | On by default. The send law was measured on hardware and matches the fader law exactly; turn off for raw 0–127                                                                                        |
-| Preamp gain range                             | Sources disagree; pick what matches your screen                                                                                                                                                       |
+| Setting                                       | Notes                                                                                                                                                                                                     |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App                                           | Which dylanmaudio app this connection controls. **MIDI Bridge** is the dLive console, and everything below; the others are covered above                                                                  |
+| Talk flash rate / cooldown / TALK page number | Talk Light only — see _Talk flash_ above                                                                                                                                                                  |
+| MIDI Bridge address / port / token            | Where the bridge is: 127.0.0.1 : 8765, beside Companion. The bridge listens on its own Mac, so the token stays empty until it grows LAN access. It is kept as a secret, and also goes to the control port |
+| Bridge app control port                       | 0 = the standard 8770, on the same address. For Run, Restart and Auto-reconnect (MIDI Bridge 1.1.9+)                                                                                                      |
+| Console firmware                              | Not detectable over MIDI; shown in `$(dlive:firmware)`                                                                                                                                                    |
+| Inputs in use / extended types                | Bounds the variable grid and the preset library                                                                                                                                                           |
+| Ask the console for                           | What the bridge fetches for every strip on connect, and on **Resync**. The desk announces only what _changes_, so without this a connection made mid-show shows nothing until someone moves something     |
+| Scene Go / Next / Previous                    | The CC number + value you assigned on the console. 0/0 = not assigned                                                                                                                                     |
+| Console Actions map                           | `cc,value,Name` per line. Optional when a firmware 2.1x show file is loaded — Actions import automatically; manual lines win on the same CC/value                                                         |
+| Show file                                     | Loaded on the connection's own **show file page**, not here — see below                                                                                                                                   |
+| Show file path (advanced)                     | Only useful when the file sits somewhere this sandboxed module can read. An uploaded show wins over it                                                                                                    |
+| Scene names (manual)                          | `scene,Name` per line; overrides the show file                                                                                                                                                            |
+| Show send levels in dB                        | On by default. The send law was measured on hardware and matches the fader law exactly; turn off for raw 0–127                                                                                            |
+| Preamp gain range                             | Sources disagree; pick what matches your screen                                                                                                                                                           |
 
 ### Status colours
 
@@ -201,9 +203,14 @@ the desk is not connected you get:
 > MIDI Bridge is running but its console link is down — check the bridge app
 
 and if the bridge itself is not reachable, the status stays amber with
-the address it is waiting on. Fix console-side problems (MIDI mode Off
-or Secure, Global MIDI Receive disabled, wrong address) in the bridge,
-not here.
+the address it is waiting on, and why: connection refused, no answer,
+unreachable. Fix console-side problems (MIDI mode Off or Secure, Global
+MIDI Receive disabled, wrong address) in the bridge, not here.
+
+A bridge that stops answering without closing the connection (its Mac
+asleep, or a network between it and Companion gone) turns the status
+amber within about 20 seconds, and **Console is answering** goes off. A
+press made while the bridge can't be reached is logged as a warning.
 
 ## Loading a show file
 

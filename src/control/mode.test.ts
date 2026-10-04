@@ -119,6 +119,18 @@ describe('a Talk Light Trigger connection', () => {
 const OPTS = { talkFlashHz: 2, talkFlashCooldownS: 10, talkFlashPage: 0 }
 
 describe('a Pilot Tone Trigger connection', () => {
+	it("sends the connection's app token with every request (#106)", async () => {
+		const mock = new CtlMock(load('ptt.json'))
+		await mock.start()
+		const host = fakeHost('ptt')
+		const mode = new ControlAppMode(host as never, 'ptt', '127.0.0.1', mock.port, { ...OPTS, token: 'app-tok' })
+		mode.start()
+		await waitFor(() => mock.requests.some((r) => r.path === '/ctl/v1/stream'), 'streaming')
+		for (const r of mock.requests) expect(r.headers.authorization, r.path).toBe('Bearer app-tok')
+		mode.stop()
+		await mock.stop()
+	})
+
 	it('has no talk flash', async () => {
 		const mock = new CtlMock(load('ptt.json'))
 		await mock.start()

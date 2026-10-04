@@ -35,8 +35,12 @@ export function parseSseFrame(raw: string): SseFrame | null {
 	return { event, data: data.join('\n'), id }
 }
 
-/** Yield frames as they arrive; returns when the server closes the stream. */
-export async function* sseFrames(body: ReadableStream<Uint8Array>): AsyncGenerator<SseFrame> {
+/**
+ * Yield frames as they arrive; returns when the server closes the stream.
+ * `onBytes` hears every read, keepalive comments included, so a watchdog
+ * can tell a quiet stream from a dead one.
+ */
+export async function* sseFrames(body: ReadableStream<Uint8Array>, onBytes?: () => void): AsyncGenerator<SseFrame> {
 	const reader = body.getReader()
 	const decoder = new TextDecoder()
 	let buf = ''
@@ -44,6 +48,7 @@ export async function* sseFrames(body: ReadableStream<Uint8Array>): AsyncGenerat
 		for (;;) {
 			const { value, done } = await reader.read()
 			if (done) return
+			onBytes?.()
 			buf += decoder.decode(value, { stream: true })
 			let idx: number
 			while ((idx = buf.indexOf('\n\n')) >= 0) {

@@ -39,7 +39,6 @@ export type ModuleConfig = {
 	/** Not a form field: each app's last catalogue, so its buttons stay defined while it is down (JSON) */
 	ctlCatalogue: string
 	bridgeCtlCatalogue: string
-	bridgeToken: string
 	baseChannel: number
 	firmware: string
 	syncScope: SyncScope
@@ -77,7 +76,6 @@ export const DEFAULT_CONFIG: ModuleConfig = {
 	bridgeCtlPort: 0,
 	ctlCatalogue: '',
 	bridgeCtlCatalogue: '',
-	bridgeToken: '',
 	baseChannel: 12,
 	firmware: '',
 	syncScope: 'names_state',
@@ -96,6 +94,28 @@ export const DEFAULT_CONFIG: ModuleConfig = {
 	sendsInDb: true,
 	preampGainRange: 'spec',
 	debugEvents: false,
+}
+
+/**
+ * Tokens live in Companion's secrets store, not the config: its web UI is
+ * sent the whole config, but only the keys of the secrets. Both stay empty
+ * while the apps take connections from their own Mac only. They are for the
+ * network access the apps will grow (#106).
+ */
+export type ModuleSecrets = {
+	/** The MIDI Bridge's Client API, and its app control endpoint */
+	bridgeToken: string
+	/** A non-bridge app's control endpoint */
+	ctlToken: string
+}
+
+export const DEFAULT_SECRETS: ModuleSecrets = { bridgeToken: '', ctlToken: '' }
+
+export function normaliseSecrets(raw: Partial<ModuleSecrets> | null | undefined): ModuleSecrets {
+	const s = { ...DEFAULT_SECRETS, ...(raw ?? {}) }
+	// a pasted token often brings a space or a newline with it
+	for (const k of ['bridgeToken', 'ctlToken'] as const) s[k] = typeof s[k] === 'string' ? s[k].trim() : ''
+	return s
 }
 
 export function normaliseConfig(raw: Partial<ModuleConfig> | null | undefined): ModuleConfig {
@@ -191,6 +211,16 @@ export function GetConfigFields(ctx: ConfigFieldContext = {}): SomeCompanionConf
 			isVisibleExpression: CONTROL_ONLY,
 		},
 		{
+			type: 'secret-text',
+			id: 'ctlToken',
+			label: 'App token',
+			tooltip:
+				'Leave this empty. The apps accept connections from their own Mac only, for now; the field is here for the LAN access they will grow, which will show a token to paste in.',
+			width: 12,
+			default: '',
+			isVisibleExpression: CONTROL_ONLY,
+		},
+		{
 			type: 'static-text',
 			id: 'infoTalkFlash',
 			width: 12,
@@ -271,11 +301,11 @@ function bridgeFields(ctx: ConfigFieldContext): SomeCompanionConfigField[] {
 			default: 0,
 		},
 		{
-			type: 'textinput',
+			type: 'secret-text',
 			id: 'bridgeToken',
 			label: 'Bridge token',
 			tooltip:
-				'Leave this empty. The bridge listens on its own Mac only; the field is here for the LAN access it will grow later, which will show a token to paste in.',
+				'Leave this empty. The bridge listens on its own Mac only; the field is here for the LAN access it will grow later, which will show a token to paste in. It goes to the bridge app control port too.',
 			width: 12,
 			default: '',
 		},
