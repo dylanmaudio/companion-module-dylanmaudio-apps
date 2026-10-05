@@ -1,7 +1,7 @@
 {
   "schema": "dlive-api-fixtures/1",
   "source": "docs/bridge-client-api-v1.md (accepted 2026-08-25; amended 2026-09-07, spec 1a: broadcast-driven mirror 1.2)",
-  "note": "Authority for the Client API wire shapes, BOTH sides: the monorepo server replays requests and asserts responses; the Companion module mocks the server from the same file (vendored by tools/sync_fixtures.sh, monorepo -> module repo — the REVERSE of the protocol fixtures). Matching rules: response bodies are SUBSET-matched (extra server keys are allowed — additive changes don't bump v1, spec §11); '<str>'/'<int>' match any value of that type; '<lane>' is substituted with the lane_id registered by the most recent hello case; 'sends' asserts the exact console-bound hex the request must produce. Never edit a case to make a test green — change the spec first, then both sides.",
+  "note": "Authority for the Client API wire shapes, BOTH sides: the monorepo server replays requests and asserts responses; the Companion module mocks the server from the same file (vendored by tools/sync_fixtures.sh, monorepo -> module repo — the REVERSE of the protocol fixtures). Matching rules: response bodies are SUBSET-matched (extra server keys are allowed — additive changes don't bump v1, spec §11); '<str>'/'<int>' match any value of that type; '<lane>' is substituted with the lane_id registered by the most recent hello case; 'sends' asserts the exact console-bound hex the request must produce. A request's 'headers' and 'content_type' are sent as given (a body is sent as application/json unless 'content_type' says otherwise); an empty 'sends' asserts that nothing reached the console. Never edit a case to make a test green — change the spec first, then both sides.",
   "cases": [
     {
       "id": "info.ok",
@@ -117,6 +117,44 @@
       "request": {"method": "DELETE", "path": "/api/v1/lane/ln_000000"},
       "response": {"status": 404, "body": {
         "ok": false, "error": {"code": "unknown_lane"}}}
+    },
+    {
+      "id": "security.origin",
+      "request": {"method": "POST", "path": "/api/v1/hello",
+        "headers": {"Origin": "https://some-website.example"},
+        "content_type": "text/plain;charset=UTF-8",
+        "body": {"v": 1, "session": "main", "name": "web page", "kind": "companion"}},
+      "response": {"status": 403, "body": {
+        "ok": false, "error": {"code": "forbidden_origin"}}},
+      "note": "#105, spec §4: a web page's cross-site POST. text/plain needs no CORS preflight; it got a lane until MIDI Bridge 1.3.1."
+    },
+    {
+      "id": "security.origin.cmd",
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+        "headers": {"Origin": "https://some-website.example"},
+        "body": {"lane_id": "<lane>", "cid": "fx9", "intent": {"op": "raw", "hex": "9b 00 7f"}}},
+      "response": {"status": 403, "body": {
+        "ok": false, "error": {"code": "forbidden_origin"}}},
+      "sends": [],
+      "note": "#105: Input 1 mute on reached the console from a web page until MIDI Bridge 1.3.1."
+    },
+    {
+      "id": "security.host",
+      "request": {"method": "GET", "path": "/api/v1/info",
+        "headers": {"Host": "attacker.example"}},
+      "response": {"status": 403, "body": {
+        "ok": false, "error": {"code": "forbidden_host"}}},
+      "note": "DNS rebinding: a hostname that resolves to 127.0.0.1 must still be refused."
+    },
+    {
+      "id": "cmd.bad_content_type",
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+        "content_type": "text/plain",
+        "body": {"lane_id": "<lane>", "cid": "fx10", "intent": {"op": "raw", "hex": "9b 00 7f"}}},
+      "response": {"status": 415, "body": {
+        "ok": false, "error": {"code": "bad_content_type"}}},
+      "sends": [],
+      "note": "A cross-site page can send text/plain without a preflight; application/json it cannot."
     }
   ]
 }
