@@ -37,6 +37,41 @@
         "safety": "critical"
       },
       {
+        "id": "cxc.go",
+        "label": "GO (cue list mode)",
+        "kind": "action",
+        "group": "transport",
+        "safety": "critical"
+      },
+      {
+        "id": "cxc.go-back",
+        "label": "Back (cue list mode)",
+        "kind": "action",
+        "group": "transport",
+        "safety": "critical"
+      },
+      {
+        "id": "cxc.go-to",
+        "label": "Jump to Moment… (cue list mode)",
+        "kind": "number",
+        "min": 1,
+        "step": 1,
+        "group": "transport",
+        "safety": "critical"
+      },
+      {
+        "id": "cxc.standby-next",
+        "label": "Standby Next (cue list mode)",
+        "kind": "action",
+        "group": "transport"
+      },
+      {
+        "id": "cxc.standby-prev",
+        "label": "Standby Previous (cue list mode)",
+        "kind": "action",
+        "group": "transport"
+      },
+      {
         "id": "cxc.toggle-mixer",
         "label": "Show / Hide Mixer",
         "kind": "action",
@@ -431,6 +466,35 @@
         "key": "cxc.frame_rate",
         "label": "Frame rate",
         "type": "string"
+      },
+      {
+        "key": "cxc.playback_mode",
+        "label": "Playback mode",
+        "type": "enum",
+        "values": [
+          "timeline",
+          "cuelist"
+        ]
+      },
+      {
+        "key": "cxc.go_standby",
+        "label": "Standby moment number",
+        "type": "number"
+      },
+      {
+        "key": "cxc.go_standby_name",
+        "label": "Standby moment",
+        "type": "string"
+      },
+      {
+        "key": "cxc.go_fired_name",
+        "label": "Last moment fired",
+        "type": "string"
+      },
+      {
+        "key": "cxc.go_count",
+        "label": "Moments in the cue list",
+        "type": "number"
       }
     ]
   },
@@ -446,7 +510,12 @@
     "cxc.output": "offline",
     "cxc.show_name": null,
     "cxc.dirty": false,
-    "cxc.frame_rate": null
+    "cxc.frame_rate": null,
+    "cxc.playback_mode": "timeline",
+    "cxc.go_standby": 0,
+    "cxc.go_standby_name": null,
+    "cxc.go_fired_name": null,
+    "cxc.go_count": 0
   },
   "refusals": {
     "go-to-marker": "Show Mode: Go to Marker is not available with no markers."
