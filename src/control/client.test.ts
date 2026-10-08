@@ -300,7 +300,15 @@ describe('ControlClient across a network (#106)', () => {
 
 describe('fixtures/control', () => {
 	it('has the demo contract and all six apps', () => {
-		expect(FILES.sort()).toEqual(['bridge.json', 'cxc.json', 'exchanges.json', 'ptt.json', 'sr.json', 'tct.json', 'tlt.json'])
+		expect(FILES.sort()).toEqual([
+			'bridge.json',
+			'cxc.json',
+			'exchanges.json',
+			'ptt.json',
+			'sr.json',
+			'tct.json',
+			'tlt.json',
+		])
 		expect(demo.cases.length).toBeGreaterThan(20)
 	})
 })
