@@ -15,6 +15,7 @@ export const APP_NAME: Record<AppId, string> = {
 	ptt: 'Pilot Tone',
 	tct: 'Time Code',
 	cxc: 'Console Control',
+	sr: 'Show Recorder',
 }
 
 /** The app's name on its Run key: the logo alone is too small to tell apart on a deck. */
@@ -24,6 +25,7 @@ export const RUN_NAME: Record<AppId, string> = {
 	ptt: 'PILOT',
 	tct: 'TIMECODE',
 	cxc: 'CONSOLE',
+	sr: 'RECORDER',
 }
 
 /** A state that lights a key: a bool key while on (off, inverted), or an enum key at a value. */
@@ -58,7 +60,7 @@ const looks: [string, KeyLook][] = [
 		`${app}.run`,
 		{ text: `${RUN_NAME[app]}\nRUN` },
 	]),
-	...(['bridge', 'tlt', 'ptt', 'tct', 'cxc'] as const).map((app): [string, KeyLook] => [
+	...(['bridge', 'tlt', 'ptt', 'tct', 'cxc', 'sr'] as const).map((app): [string, KeyLook] => [
 		`${app}.show`,
 		{ text: `SHOW\n${RUN_NAME[app]}` },
 	]),
@@ -84,6 +86,16 @@ const looks: [string, KeyLook][] = [
 	['tct.ltc_out', { text: 'LTC\nOUT' }],
 	['tct.reset_counters', { text: 'RESET\nCOUNTERS' }],
 	...Object.entries(RATES).map(([value, t]): [string, KeyLook] => [`tct.generate_rate=${value}`, { text: t }]),
+
+	['sr.record', { text: 'REC', lit: [{ key: 'sr.transport', value: 'recording', bg: KEY.alarm }] }],
+	['sr.stop', { text: 'STOP' }],
+	['sr.play_stop', { text: 'PLAY', lit: [{ key: 'sr.transport', value: 'playing', bg: KEY.on }] }],
+	['sr.start', { text: 'TO\nSTART' }],
+	['sr.marker', { text: 'ADD\nMARKER' }],
+	['sr.go_marker', { text: 'GO TO\nMARKER' }],
+	['sr.prev', { text: 'PREV\nMARKER' }],
+	['sr.next', { text: 'NEXT\nMARKER' }],
+	['sr.reset_dropouts', { text: 'RESET\nDROPOUTS' }],
 
 	['cxc.play', { text: 'PLAY', lit: [{ key: TRANSPORT, value: 'playing', bg: KEY.on }] }],
 	['cxc.stop', { text: 'STOP' }],

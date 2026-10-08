@@ -4,7 +4,7 @@
  * sides are held to one contract. Never edit a case to make this green.
  *
  * The connection tests run against Pilot Tone Trigger's real catalogue. The
- * /cmd replay runs over every fixture file: all five apps, and the demo
+ * /cmd replay runs over every fixture file: all six apps, and the demo
  * contract, which still pins wire cases no app exercises (the browser
  * protections, every error code).
  */
@@ -299,8 +299,8 @@ describe('ControlClient across a network (#106)', () => {
 })
 
 describe('fixtures/control', () => {
-	it('has the demo contract and all five apps', () => {
-		expect(FILES.sort()).toEqual(['bridge.json', 'cxc.json', 'exchanges.json', 'ptt.json', 'tct.json', 'tlt.json'])
+	it('has the demo contract and all six apps', () => {
+		expect(FILES.sort()).toEqual(['bridge.json', 'cxc.json', 'exchanges.json', 'ptt.json', 'sr.json', 'tct.json', 'tlt.json'])
 		expect(demo.cases.length).toBeGreaterThan(20)
 	})
 })

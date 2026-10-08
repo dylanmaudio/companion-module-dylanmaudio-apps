@@ -14,7 +14,7 @@ import { timecodeReadoutPresets } from '../readout-defs.js'
 import { PALETTE, PTT_TILE } from './palette.js'
 
 type Json = Record<string, any>
-const APPS: AppId[] = ['bridge', 'tlt', 'ptt', 'tct', 'cxc']
+const APPS: AppId[] = ['bridge', 'tlt', 'ptt', 'tct', 'cxc', 'sr']
 const catOf = (app: AppId): Catalogue => {
 	const fx = load(`${app}.json`)
 	return { app: fx.app.id, name: fx.app.name, version: 'x', hash: 'h', ...fx.catalogue } as Catalogue
@@ -60,9 +60,12 @@ describe('styled keys', () => {
 		for (const app of APPS) {
 			const { presets } = looksFor(app)
 			expect(presets[`p_${app}__look_logo`]?.steps[0].down[0].actionId).toBe(OPEN_APP_ACTION)
-			if (app !== 'cxc') expect(presets[`p_${app}__look_menubar`]?.steps[0].down[0].actionId).toBe(OPEN_APP_ACTION)
+			// Console Control and Show Recorder are windowed apps: no menu-bar icon to mirror
+			if (app !== 'cxc' && app !== 'sr')
+				expect(presets[`p_${app}__look_menubar`]?.steps[0].down[0].actionId).toBe(OPEN_APP_ACTION)
 		}
 		expect(looksFor('cxc').presets.p_cxc__look_menubar).toBeUndefined()
+		expect(looksFor('sr').presets.p_sr__look_menubar).toBeUndefined()
 	})
 
 	it('every text is big enough to read on a Stream Deck key', () => {
