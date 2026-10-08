@@ -86,7 +86,7 @@ export function buildLookPresets(
 
 	// The menu-bar icon, mirrored state by state.
 	const stateKey = MENUBAR_STATE[app]
-	if (stateKey && app !== 'cxc' && has(stateKey)) {
+	if (stateKey && app !== 'cxc' && app !== 'sr' && has(stateKey)) {
 		const icons = MENUBAR_ICONS[app] as Record<string, string>
 		const feedbacks = Object.entries(icons)
 			.filter(([value]) => value !== 'stopped' && value !== 'activity')
