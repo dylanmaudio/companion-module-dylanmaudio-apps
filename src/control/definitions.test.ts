@@ -412,7 +412,7 @@ describe('Console Control (fixtures/control/cxc.json)', () => {
 
 	it('keeps the command names, hyphens and all, in the action ids', () => {
 		const ids = Object.keys(buildControlActions(cc, async () => undefined))
-		expect(ids).toHaveLength(53)
+		expect(ids).toHaveLength(58)
 		expect(ids).toEqual(
 			expect.arrayContaining(['ctl_cxc__go-to-start', 'ctl_cxc__toggle-show-mode', 'ctl_cxc__go-to-marker']),
 		)

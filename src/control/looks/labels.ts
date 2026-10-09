@@ -88,6 +88,12 @@ const looks: [string, KeyLook][] = [
 	['cxc.play', { text: 'PLAY', lit: [{ key: TRANSPORT, value: 'playing', bg: KEY.on }] }],
 	['cxc.stop', { text: 'STOP' }],
 	['cxc.go-to-start', { text: 'TO\nSTART' }],
+	// Cue list mode (Console Control 0.3.0): GO and Back light while the show plays as a cue list.
+	['cxc.go', { text: 'GO', lit: [{ key: 'cxc.playback_mode', value: 'cuelist', bg: KEY.on }] }],
+	['cxc.go-back', { text: 'BACK', lit: [{ key: 'cxc.playback_mode', value: 'cuelist', bg: KEY.on }] }],
+	['cxc.go-to', { text: 'JUMP\nTO' }],
+	['cxc.standby-next', { text: 'STANDBY\nNEXT' }],
+	['cxc.standby-prev', { text: 'STANDBY\nPREV' }],
 	[
 		'cxc.record',
 		{
