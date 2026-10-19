@@ -14,6 +14,15 @@
         "return_port_policy": "broadcasts", "seq": "<int>"}}
     },
     {
+      "id": "info.console",
+      "note": "Spec §1b (2026-10-19, MIDI Bridge 1.4.90): info and hello carry the active driver's client profile. On the dLive it is exactly Talk Light's and Pilot Tone's fallback (shared/bridge_link.fallback_profile) at the bridge's base channel. Additive: a client that ignores it is unaffected.",
+      "request": {"method": "GET", "path": "/api/v1/info"},
+      "response": {"status": 200, "body": {"console": {
+        "driver": "dlive", "title": "dLive",
+        "scenes": {"noun": "Scene", "first": 1, "last": 500},
+        "triggers": {"noun": "SoftKey", "id_prefix": "cc"}}}}
+    },
+    {
       "id": "hello.ok",
       "request": {"method": "POST", "path": "/api/v1/hello",
                   "body": {"v": 1, "session": "main",
