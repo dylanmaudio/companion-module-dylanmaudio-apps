@@ -876,3 +876,18 @@ feedback on the page would have read as disconnected.
 - **Cold sync runs on a verified family and costs ~138 messages** of
   dLive-shaped Gets. Harmless reads, but they should become the family's
   own addresses before this is anything but a test build.
+
+### Levels on the SQ, verified 21 Oct (module 1.1.92)
+
+With the dB path in, against MIDI Bridge 1.4.92 on the SQ-5:
+
+- **Read:** `fader_ch1` = `0.0` dB with `fader_lv_ch1` = **15196**. That
+  wire value is the SQ's own 14-bit scale (0x765C = 118×128 + 92), which
+  is 0 dB on its linear law — not a 0-127 lv. The desk's dB is what the
+  variable shows; our dLive table is not involved.
+- **Write:** a +1 dB nudge sent one message and came back at `+1.0` dB,
+  wire **15315**. 119 steps for 1 dB matches the law's ~1,187 per 10 dB.
+  The reverse nudge returned it to 15196 exactly.
+- A raw 0-127 level is still refused on a non-dLive family; that path is
+  covered by unit tests rather than a desk press, since the test page has
+  no raw key.
