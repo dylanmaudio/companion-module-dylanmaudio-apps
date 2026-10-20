@@ -648,6 +648,37 @@ describe('BridgeLink', () => {
 			fresh.stop()
 		})
 
+		it('a verified family is driven, but not with dLive-scaled values', async () => {
+			link.stop()
+			bridge.console = { driver: 'sq', title: 'SQ', verified_on_desk: true }
+			bridge.cmds.length = 0
+			const fresh = new BridgeLink({
+				host: '127.0.0.1',
+				port: bridge.port,
+				laneName: 'sq-ok',
+				baseChannel: 1,
+				retryMs: 50,
+			})
+			fresh.start()
+			await waitFor(() => bridge.hellos.length > 0, 'connect')
+			// family-neutral: these travel
+			expect(fresh.send({ op: 'mute', type: 'input', index: 1, on: true })).toBe(true)
+			expect(fresh.send({ op: 'scene', scene: 2 })).toBe(true)
+			// dLive-scaled: 107 is unity here and near silence on a 14-bit desk
+			expect(fresh.send({ op: 'fader', type: 'input', index: 1, level: 107 })).toBe(false)
+			fresh.fadeTo({ type: 'input', index: 1 }, 107, 1000)
+			// dLive bytes: never, on any other desk
+			expect(fresh.send({ op: 'dca_assign', type: 'input', index: 1, dca: 1, on: true })).toBe(false)
+			await waitFor(() => bridge.cmds.some((c) => (c.body.intent as { op?: string }).op === 'mute'), 'mute')
+			await new Promise((r) => setTimeout(r, 100))
+			const ops = bridge.cmds.map((c) => (c.body.intent as { op?: string }).op)
+			expect(ops).toContain('scene')
+			expect(ops).not.toContain('fader')
+			expect(ops).not.toContain('fade')
+			expect(ops).not.toContain('raw')
+			fresh.stop()
+		})
+
 		it('says so in the connection status', async () => {
 			const { fresh } = await connectTo({ driver: 'sq', title: 'SQ' })
 			await waitFor(() => fresh.status === 'failure', 'status')

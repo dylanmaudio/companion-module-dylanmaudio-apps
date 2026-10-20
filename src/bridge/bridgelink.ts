@@ -58,6 +58,13 @@ const FIRST_CLASS = new Set([
  */
 const GATED = new Set(['send_level'])
 
+/**
+ * Ops whose value is a dLive fader scale (0-127 lv). Another family's bridge
+ * takes dB for these, so they stay refused even on a verified desk until the
+ * module speaks that scale.
+ */
+const SCALED_OPS = new Set(['fader', 'fade', 'send_level', 'get_fader', 'get_send_level'])
+
 /** Gets in flight during a cold sync: enough to be quick, not a spray (client API §11). */
 const COLD_SYNC_LANES = 4
 
@@ -127,6 +134,13 @@ export function foreignFamily(info: Record<string, unknown>): string | null {
 	return typeof title === 'string' && title !== '' ? title : driver
 }
 
+/** The bridge says this console's driver has been run against a real desk. */
+export function familyVerified(info: Record<string, unknown>): boolean {
+	const block = info.console
+	if (typeof block !== 'object' || block === null) return false
+	return (block as { verified_on_desk?: unknown }).verified_on_desk === true
+}
+
 function errorOf(json: Record<string, unknown>): { code?: string; message?: string } {
 	const e = json.error
 	if (typeof e !== 'object' || e === null) return {}
@@ -169,7 +183,10 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	 * `null` means a dLive, which is the only family this version drives.
 	 */
 	private foreignFamily: string | null = null
+	/** the bridge says this family's driver has been run against a real desk */
+	private familyVerified = false
 	private saidForeign = false
+	private readonly saidScaled = new Set<string>()
 	private baseN: number
 	/** the bridge's own base channel, adopted from /info */
 	public bridgeBaseChannel: number | undefined
@@ -468,6 +485,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		// See the session report §3.2 and §5.
 		this.caps = info.json.capabilities ?? {}
 		this.foreignFamily = foreignFamily(info.json)
+		this.familyVerified = familyVerified(info.json)
 
 		// 2. hello
 		await this.hello()
@@ -718,6 +736,27 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	private refuseForeign(op: string): boolean {
 		const family = this.foreignFamily
 		if (!family) return false
+		// A verified family may be driven — but only with ops whose values carry
+		// no dLive scale. A fader is 0-127 here and the bridge wants dB on any
+		// other desk, so those stay shut until the dB path exists (#SQ 1.2.0).
+		if (this.familyVerified) {
+			// Anything not first-class is encoded here as dLive bytes, so it can
+			// never travel to another desk whatever the bridge says it verified.
+			const dliveBytes = !FIRST_CLASS.has(op) && !GATED.has(op)
+			if (!SCALED_OPS.has(op) && !dliveBytes) return false
+			if (!this.saidScaled.has(op)) {
+				this.saidScaled.add(op)
+				this.emit(
+					'log',
+					'info',
+					dliveBytes
+						? `${op} isn't sent on a ${family}: it is encoded as dLive bytes, which mean something else there.`
+						: `${op} isn't sent on a ${family}: its value is a dLive fader scale, and this desk wants dB. ` +
+								`Mutes, scenes and names work; levels come with the console's own scale.`,
+				)
+			}
+			return true
+		}
 		if (!this.saidForeign) {
 			this.saidForeign = true
 			this.emit(
