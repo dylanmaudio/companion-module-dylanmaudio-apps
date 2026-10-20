@@ -65,6 +65,9 @@ const GATED = new Set(['send_level'])
  */
 const SCALED_OPS = new Set(['fader', 'fade', 'send_level', 'get_fader', 'get_send_level'])
 
+/** The console families this build drives, declared at hello (Client API §1b). */
+const CONSOLES = ['dlive', 'sq']
+
 /** Gets in flight during a cold sync: enough to be quick, not a spray (client API §11). */
 const COLD_SYNC_LANES = 4
 
@@ -541,6 +544,11 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			session: 'main',
 			name: this.opts.laneName,
 			kind: 'companion',
+			// MIDI Bridge 1.4.93+: a client that doesn't declare its families is
+			// treated as dLive-only and has its writes refused on any other desk.
+			// We name what this build actually handles; the per-op gate above is
+			// still what stops a dLive-scaled value reaching one of them.
+			consoles: CONSOLES,
 		})
 		const refused = refusal(res.status, res.json)
 		if (refused) throw refused

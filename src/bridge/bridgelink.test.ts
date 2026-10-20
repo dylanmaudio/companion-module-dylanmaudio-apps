@@ -679,6 +679,24 @@ describe('BridgeLink', () => {
 			fresh.stop()
 		})
 
+		it('declares the families it handles at hello', async () => {
+			// 1.4.93+ refuses writes from a client that didn't say; without this
+			// the SQ mutes and scenes would come back 400 wrong_console
+			link.stop()
+			bridge.hellos.length = 0
+			const fresh = new BridgeLink({
+				host: '127.0.0.1',
+				port: bridge.port,
+				laneName: 'hello-consoles',
+				baseChannel: 1,
+				retryMs: 50,
+			})
+			fresh.start()
+			await waitFor(() => bridge.hellos.length > 0, 'hello')
+			expect(bridge.hellos[0].consoles).toEqual(['dlive', 'sq'])
+			fresh.stop()
+		})
+
 		it('says so in the connection status', async () => {
 			const { fresh } = await connectTo({ driver: 'sq', title: 'SQ' })
 			await waitFor(() => fresh.status === 'failure', 'status')
