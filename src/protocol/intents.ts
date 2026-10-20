@@ -102,7 +102,15 @@ export const INTENT_TIER: Record<IntentOp, 'hardware' | 'two-impl' | 'single' | 
  */
 export type ConsoleEvent =
 	| { kind: 'mute'; type: ChannelType; index: number; on: boolean }
-	| { kind: 'fader'; type: ChannelType; index: number; level: number }
+	| {
+			kind: 'fader'
+			type: ChannelType
+			index: number
+			/** wire value: a dLive lv, or another family's own units */
+			level: number
+			/** dB as the desk reported it, where it does; undefined on a dLive */
+			db?: number | null
+	  }
 	/**
 	 * A bare `63` with no parameter or level after it. The name is historical:
 	 * no console sends this for a fader move (that was a parser dropping running

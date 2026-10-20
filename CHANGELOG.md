@@ -1,5 +1,24 @@
 # Changelog — dylanmaudio-apps (Bitfocus Companion module)
 
+## Unreleased (1.1.9x test line, not for the store)
+
+- **Levels on a console that isn't a dLive.** A fader was a 0–127 dLive
+  wire value all the way down, which is unity here and near silence on a
+  14-bit desk. The level a caller asks for now carries its own scale —
+  dB, or a dLive lv — and the link resolves it against the family it is
+  attached to: dB goes to another desk as `db` / `to_db` and the bridge
+  converts with the law that desk is actually set to. A raw 0–127 is
+  refused there and says why, because there is no honest way to read it.
+- **The level that comes back is the desk's own.** Another family's
+  mirror sends `{wire, db, steps}`; we keep its dB rather than running
+  its wire value through the dLive taper. The dLive's `{lv, db}` is
+  unchanged, and its dB still comes from our measured table.
+- **Nudges step in dB**, which every family understands, instead of
+  stepping the dLive's table.
+- Levels stay held back when `capabilities.fader_db` is false: that means
+  the bridge hasn't verified that family's law on a desk, so a dB would
+  not land where it says.
+
 ## 1.1.1 — 2026-10
 
 Same module as 1.1.0, which was submitted and withdrawn before review —

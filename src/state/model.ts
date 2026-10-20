@@ -28,7 +28,15 @@ export interface StripState {
 	colour: Colour
 	colourKnown: boolean
 	mute: boolean | undefined
+	/** the wire value: a dLive lv (0-127), or another family's own units */
 	level: number | undefined
+	/**
+	 * dB as the desk itself reports it, where it does (`{wire, db, steps}`).
+	 * On a dLive this stays undefined and dB is derived from `level` through
+	 * the measured table; on another family there is no such table here, so
+	 * this is the only honest source.
+	 */
+	db: number | null | undefined
 	params: Map<number, number>
 	sends: Map<string, number>
 	/** input → mix assigns, keyed by destination channelKey */
@@ -92,6 +100,7 @@ export class ConsoleState {
 				colourKnown: false,
 				mute: undefined,
 				level: undefined,
+				db: undefined,
 				params: new Map(),
 				sends: new Map(),
 				mixes: new Map(),
@@ -150,8 +159,9 @@ export class ConsoleState {
 			}
 			case 'fader': {
 				const s = this.strip(ev)
-				if (s.level === ev.level) return []
+				if (s.level === ev.level && s.db === ev.db) return []
 				s.level = ev.level
+				s.db = ev.db
 				return [faderPath(ev)]
 			}
 			// Events, not channel state: a ping carries no value, and CC / strip

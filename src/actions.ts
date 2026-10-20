@@ -21,6 +21,7 @@ import {
 	preampGainToValue,
 	preampValueToGain,
 	stepDb,
+	stepFromDb,
 	stepLv,
 } from './protocol/levels.js'
 import type { PeqParam } from './protocol/intents.js'
@@ -146,7 +147,7 @@ export function buildActions(ctx: ModuleContext): CompanionActionDefinitions<Act
 			options: [...channelFields({ types: CHOICES_FADER_TYPES }), DB_FIELD('db', 'Level', '0'), FADE_FIELD],
 			callback: run((o) => {
 				const ref = readChannel(o)
-				link.fadeTo(ref, dbToLv(readDb(o, 'db')), num(o, 'fade'))
+				link.fadeTo(ref, { db: readDb(o, 'db') }, num(o, 'fade'))
 			}),
 			learn: (event) => {
 				try {
@@ -178,12 +179,15 @@ export function buildActions(ctx: ModuleContext): CompanionActionDefinitions<Act
 					)
 					return
 				}
-				link.fadeTo(ref, stepDb(cur, num(o, 'delta', 1)), num(o, 'fade'))
+				// step in dB, which every family understands, rather than in lv
+				const from = link.state.strip(ref).db ?? lvToDb(cur)
+				link.fadeTo(ref, { db: stepFromDb(from, num(o, 'delta', 1)) }, num(o, 'fade'))
 			}),
 		},
 		fader_raw: {
 			name: 'Fader: set raw value (0–127)',
-			description: 'Set a fader by MIDI value; 107 = 0 dB, 0 = −∞',
+			description:
+				'Set a fader by dLive MIDI value; 107 = 0 dB, 0 = −∞. Not sent to other consoles — use Set level (dB) there.',
 			options: [
 				...channelFields({ types: CHOICES_FADER_TYPES }),
 				{ type: 'number', id: 'lv', label: 'Value', default: 107, min: 0, max: 127 },
@@ -207,9 +211,9 @@ export function buildActions(ctx: ModuleContext): CompanionActionDefinitions<Act
 						link.query({ op: 'get_fader', ...ref }, faderPath(ref), 'high')
 						return
 					}
-					link.fadeTo(ref, stepLv(cur, steps), num(o, 'fade'))
+					link.fadeTo(ref, { lv: stepLv(cur, steps) }, num(o, 'fade'))
 				} else {
-					link.fadeTo(ref, Math.max(0, Math.min(127, Math.round(num(o, 'lv', 107)))), num(o, 'fade'))
+					link.fadeTo(ref, { lv: Math.max(0, Math.min(127, Math.round(num(o, 'lv', 107)))) }, num(o, 'fade'))
 				}
 			}),
 		},

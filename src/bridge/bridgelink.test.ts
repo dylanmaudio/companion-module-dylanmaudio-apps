@@ -377,11 +377,11 @@ describe('BridgeLink', () => {
 	it('fades go to the bridge fade op with to_lv', async () => {
 		link.start()
 		await waitFor(() => link.isOk, 'ok')
-		link.fadeTo({ type: 'input', index: 5 }, 95, 2000)
+		link.fadeTo({ type: 'input', index: 5 }, { lv: 95 }, 2000)
 		await waitFor(() => bridge.cmds.length >= 1, 'fade')
 		expect(bridge.cmds[0].body.intent).toEqual({ op: 'fade', type: 'input', index: 5, to_lv: 95, over_ms: 2000 })
 		// zero duration bypasses the fade op
-		link.fadeTo({ type: 'input', index: 5 }, 0, 0)
+		link.fadeTo({ type: 'input', index: 5 }, { lv: 0 }, 0)
 		await waitFor(() => bridge.cmds.length >= 2, 'jump')
 		expect((bridge.cmds[1].body.intent as { op: string }).op).toBe('fader')
 	})
@@ -603,7 +603,7 @@ describe('BridgeLink', () => {
 			expect(fresh.send({ op: 'fader', type: 'input', index: 5, level: 107 })).toBe(false)
 			expect(fresh.send({ op: 'mute', type: 'input', index: 5, on: true })).toBe(false)
 			expect(fresh.send({ op: 'scene', scene: 3 })).toBe(false)
-			fresh.fadeTo({ type: 'input', index: 5 }, 107, 2000)
+			fresh.fadeTo({ type: 'input', index: 5 }, { lv: 107 }, 2000)
 			await new Promise((r) => setTimeout(r, 120))
 			expect(bridge.cmds.filter((c) => (c.body.intent as { op?: string }).op !== 'query')).toEqual([])
 			const warnings = logs.filter((l) => l.startsWith('warn:') && l.includes('SQ'))
@@ -669,7 +669,7 @@ describe('BridgeLink', () => {
 			expect(fresh.send({ op: 'scene', scene: 2 })).toBe(true)
 			// dLive-scaled: 107 is unity here and near silence on a 14-bit desk
 			expect(fresh.send({ op: 'fader', type: 'input', index: 1, level: 107 })).toBe(false)
-			fresh.fadeTo({ type: 'input', index: 1 }, 107, 1000)
+			fresh.fadeTo({ type: 'input', index: 1 }, { lv: 107 }, 1000)
 			// dLive bytes: never, on any other desk
 			expect(fresh.send({ op: 'dca_assign', type: 'input', index: 1, dca: 1, on: true })).toBe(false)
 			await waitFor(() => bridge.cmds.some((c) => (c.body.intent as { op?: string }).op === 'mute'), 'mute')
@@ -698,6 +698,77 @@ describe('BridgeLink', () => {
 			await waitFor(() => bridge.hellos.length > 0, 'hello')
 			expect(bridge.hellos[0].consoles).toEqual(['dlive', 'sq'])
 			fresh.stop()
+		})
+
+		it('sends a level to a verified desk in dB, never in lv', async () => {
+			link.stop()
+			bridge.console = { driver: 'sq', title: 'SQ', verified_on_desk: true }
+			bridge.caps = { raw: false, fade: true, query: true, fader_db: true, send_level: false }
+			bridge.cmds.length = 0
+			const fresh = new BridgeLink({
+				host: '127.0.0.1',
+				port: bridge.port,
+				laneName: 'sq-db',
+				baseChannel: 1,
+				retryMs: 50,
+			})
+			fresh.start()
+			await waitFor(() => fresh.status === 'ok', 'ok')
+			fresh.fadeTo({ type: 'input', index: 1 }, { db: -6 }, 0)
+			fresh.fadeTo({ type: 'input', index: 2 }, { db: 0 }, 2000)
+			// a dLive wire value has no meaning here, so it isn't guessed at
+			fresh.fadeTo({ type: 'input', index: 3 }, { lv: 107 }, 0)
+			await waitFor(() => bridge.cmds.length >= 2, 'cmds')
+			await new Promise((r) => setTimeout(r, 80))
+			// both are posted without awaiting, so they can arrive either way round
+			const sent = bridge.cmds.map((c) => c.body.intent as Record<string, unknown>)
+			expect(sent).toHaveLength(2)
+			expect(sent).toContainEqual(expect.objectContaining({ op: 'fader', type: 'input', index: 1, db: -6 }))
+			expect(sent).toContainEqual(
+				expect.objectContaining({ op: 'fade', type: 'input', index: 2, to_db: 0, over_ms: 2000 }),
+			)
+			expect(sent.every((i) => i.level === undefined && i.to_lv === undefined)).toBe(true)
+			fresh.stop()
+		})
+
+		it("holds levels back when the bridge hasn't verified the dB law", async () => {
+			link.stop()
+			bridge.console = { driver: 'sq', title: 'SQ', verified_on_desk: true }
+			bridge.caps = { raw: false, fade: true, query: true, fader_db: false }
+			bridge.cmds.length = 0
+			const fresh = new BridgeLink({
+				host: '127.0.0.1',
+				port: bridge.port,
+				laneName: 'sq-nodb',
+				baseChannel: 1,
+				retryMs: 50,
+			})
+			fresh.start()
+			await waitFor(() => fresh.status === 'ok', 'ok')
+			fresh.fadeTo({ type: 'input', index: 1 }, { db: -6 }, 0)
+			await new Promise((r) => setTimeout(r, 100))
+			expect(bridge.cmds.filter((c) => (c.body.intent as { op?: string }).op !== 'query')).toEqual([])
+			fresh.stop()
+		})
+
+		it("reads the other families' fader shape, and keeps the dLive's", () => {
+			// {wire, db, steps}: the desk's own resolution and its own dB
+			expect(deltaToEvent('input.5.fader', { wire: 9000, db: -6.2, steps: 16384 })).toEqual({
+				kind: 'fader',
+				type: 'input',
+				index: 5,
+				level: 9000,
+				db: -6.2,
+			})
+			// -inf survives as null, not as "missing"
+			expect(deltaToEvent('input.5.fader', { wire: 0, db: null, steps: 16384 })).toMatchObject({ db: null })
+			// the dLive's shape is unchanged, and its db is ignored: ours is measured
+			expect(deltaToEvent('input.5.fader', { lv: 95, db: -6.1 })).toEqual({
+				kind: 'fader',
+				type: 'input',
+				index: 5,
+				level: 95,
+			})
 		})
 
 		it('says so in the connection status', async () => {

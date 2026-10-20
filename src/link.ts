@@ -20,6 +20,7 @@ import { SubscriptionRegistry } from './state/subscriptions.js'
 import type { ConsoleTransport } from './transport/transport.js'
 import { FadeEngine } from './fades.js'
 
+import { dbToLv } from './protocol/levels.js'
 import type { LinkApi, LinkDiag, LinkEvents, LinkStatus, SyncScope } from './link-api.js'
 import { localEvent } from './protocol/localevent.js'
 
@@ -335,8 +336,10 @@ export class ConsoleLink extends EventEmitter<LinkEvents> implements LinkApi {
 		this.scheduler.request({ intent, path, priority }, this.now())
 	}
 
-	/** Fade a strip's fader to `toLv` over `durationMs`. Unknown current level → Get it first (≤300 ms), else jump. */
-	fadeTo(ref: ChannelRef, toLv: number, durationMs: number): void {
+	/** Fade a strip's fader to `to` over `durationMs`. Unknown current level → Get it first (≤300 ms), else jump. */
+	fadeTo(ref: ChannelRef, to: LevelRequest, durationMs: number): void {
+		// This path only ever talks to a dLive, so dB resolves through its table.
+		const toLv = 'lv' in to ? to.lv : dbToLv(to.db)
 		const key = channelKey(ref)
 		const from = this.state.strip(ref).level
 		if (durationMs <= 0) {

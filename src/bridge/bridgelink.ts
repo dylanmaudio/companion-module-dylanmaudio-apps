@@ -22,10 +22,11 @@
 import { EventEmitter } from 'node:events'
 import { CHANNEL_TABLE, isChannelType, type ChannelRef, type Colour } from '../protocol/channels.js'
 import { encode, toHex } from '../protocol/encode.js'
+import { dbToLv } from '../protocol/levels.js'
 import { intentSocket, type ConsoleEvent, type Intent } from '../protocol/intents.js'
 import { ConsoleState, CONNECTION_PATH } from '../state/model.js'
 import { SubscriptionRegistry } from '../state/subscriptions.js'
-import type { LinkApi, LinkDiag, LinkEvents, LinkStatus, SyncScope } from '../link-api.js'
+import type { LevelRequest, LinkApi, LinkDiag, LinkEvents, LinkStatus, SyncScope } from '../link-api.js'
 import { localEvent } from '../protocol/localevent.js'
 import { hostPort, httpOrigin, netReason } from '../util/net.js'
 import { StreamWatchdog } from '../util/watchdog.js'
@@ -171,6 +172,8 @@ interface BridgeCaps {
 	fade?: boolean
 	raw?: boolean
 	send_level?: boolean
+	/** the bridge's dB conversion is verified on a desk for this family's law */
+	fader_db?: boolean
 }
 
 export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
@@ -291,13 +294,52 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		}
 	}
 
-	fadeTo(ref: ChannelRef, toLv: number, durationMs: number): void {
+	fadeTo(ref: ChannelRef, to: LevelRequest, durationMs: number): void {
+		const ms = Math.round(durationMs)
+		// Another family: dB is the only unit that crosses, and the bridge does
+		// the conversion with the law the desk is actually set to.
+		if (this.foreignFamily) {
+			if (!this.familyVerified) {
+				this.refuseForeign('fade')
+				return
+			}
+			if (!('db' in to)) {
+				this.sayOnce(
+					`raw-${ref.type}`,
+					`A raw 0-127 level isn't sent to a ${this.foreignFamily}: that is a dLive wire value. Use Fader: set level (dB).`,
+				)
+				return
+			}
+			if (this.caps.fader_db === false) {
+				this.sayOnce(
+					'fader_db',
+					`Levels aren't sent to a ${this.foreignFamily}: MIDI Bridge hasn't verified its dB law, so a dB here wouldn't land where it says.`,
+				)
+				return
+			}
+			const body =
+				durationMs <= 0 || this.caps.fade === false
+					? { op: 'fader', type: ref.type, index: ref.index, db: to.db }
+					: { op: 'fade', type: ref.type, index: ref.index, to_db: to.db, over_ms: ms }
+			// No optimistic local apply: the desk's own value comes back on the
+			// mirror, and inventing one in a scale we don't own would be a guess.
+			void this.postCmd(body)
+			return
+		}
+		const toLv = 'lv' in to ? to.lv : dbToLv(to.db)
 		if (this.refuseForeign('fade')) return
 		if (durationMs <= 0 || this.caps.fade === false) {
 			this.send({ op: 'fader', type: ref.type, index: ref.index, level: toLv })
 			return
 		}
-		void this.postCmd({ op: 'fade', type: ref.type, index: ref.index, to_lv: toLv, over_ms: Math.round(durationMs) })
+		void this.postCmd({ op: 'fade', type: ref.type, index: ref.index, to_lv: toLv, over_ms: ms })
+	}
+
+	/** One log line per reason, not one per press. */
+	private sayOnce(key: string, message: string): void {
+		if (this.saidScaled.has(key)) return
+		this.saidScaled.add(key)
+		this.emit('log', 'info', message)
 	}
 
 	fadeSend(src: ChannelRef, dst: ChannelRef, _fromLv: number, toLv: number, _durationMs: number): void {
@@ -808,7 +850,24 @@ export function deltaToEvent(path: string, value: unknown): ConsoleEvent | undef
 		case 'mute':
 			return { kind: 'mute', ...ref, on: value === true }
 		case 'fader': {
-			const lv = typeof value === 'object' && value !== null ? Number((value as { lv?: unknown }).lv) : Number(value)
+			// Two shapes. The dLive's is {lv, db} and is frozen: lv is 0-127 and
+			// dB comes from our own measured table, so the db it sends is ignored.
+			// Every other family sends {wire, db, steps} — its own resolution,
+			// which may be 16,384 — and its db is the only one we can trust,
+			// because the taper that produced it lives on the desk.
+			if (typeof value === 'object' && value !== null) {
+				const o = value as { lv?: unknown; wire?: unknown; db?: unknown; steps?: unknown }
+				if (o.wire !== undefined) {
+					const wire = Number(o.wire)
+					if (!Number.isFinite(wire)) return undefined
+					const db = o.db === null ? null : Number(o.db)
+					return { kind: 'fader', ...ref, level: wire, db: db === null || Number.isFinite(db) ? db : undefined }
+				}
+				const lv = Number(o.lv)
+				if (!Number.isInteger(lv) || lv < 0 || lv > 127) return undefined
+				return { kind: 'fader', ...ref, level: lv }
+			}
+			const lv = Number(value)
 			if (!Number.isInteger(lv) || lv < 0 || lv > 127) return undefined
 			return { kind: 'fader', ...ref, level: lv }
 		}

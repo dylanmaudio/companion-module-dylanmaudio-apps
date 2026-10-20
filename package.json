@@ -1,6 +1,6 @@
 {
 	"name": "dylanmaudio-apps",
-	"version": "1.1.91",
+	"version": "1.1.92",
 	"description": "Companion module for the dylanmaudio apps: dLive MIDI Bridge, Talk Light Trigger, Pilot Tone Trigger, Time Code Tool and Console Control",
 	"main": "dist/main.js",
 	"type": "module",
