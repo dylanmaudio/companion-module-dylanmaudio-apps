@@ -661,6 +661,9 @@ describe('BridgeLink', () => {
 			})
 			fresh.start()
 			await waitFor(() => bridge.hellos.length > 0, 'connect')
+			// a verified desk is a working connection, not a failed one, or every
+			// feedback on the page reads as disconnected
+			await waitFor(() => fresh.status === 'ok', 'status ok')
 			// family-neutral: these travel
 			expect(fresh.send({ op: 'mute', type: 'input', index: 1, on: true })).toBe(true)
 			expect(fresh.send({ op: 'scene', scene: 2 })).toBe(true)

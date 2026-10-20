@@ -578,7 +578,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	}
 
 	private applyConsoleState(): void {
-		if (this.foreignFamily) {
+		if (this.foreignFamily && !this.familyVerified) {
 			// Not a transport failure: the link is fine and the desk is the wrong one.
 			this.setStatus(
 				'failure',
