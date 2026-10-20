@@ -870,9 +870,12 @@ feedback on the page would have read as disconnected.
   empty `name_ch1` where it should fall back to its own label and number
   ("Input 1"). The bridge already sends the flag.
 - **The SQ has no scene path in the mirror** (490 paths, none for scene),
-  because the desk reports a scene only when one is recalled. Nothing can
-  restore a previous scene by itself, so a recall preset on an SQ can't
-  offer an undo.
+  so on connect nothing knows which scene the desk is on. It is learned
+  the first time one is recalled: from 1.4.95 the bridge fires `scene`
+  on **every** SQ recall, a re-recall of the current scene included. So a
+  recall preset can offer an undo once it has seen one go by, but never
+  straight after connecting — and it should say which, rather than
+  offering an undo that silently does the wrong thing.
 - **Cold sync runs on a verified family and costs ~138 messages** of
   dLive-shaped Gets. Harmless reads, but they should become the family's
   own addresses before this is anything but a test build.
@@ -891,3 +894,14 @@ With the dB path in, against MIDI Bridge 1.4.92 on the SQ-5:
 - A raw 0-127 level is still refused on a non-dLive family; that path is
   covered by unit tests rather than a desk press, since the test page has
   no raw key.
+
+### Bridge ops to pick up later (MIDI Bridge 1.4.95)
+
+- **`batch`** — up to 1,024 mute / fader / send_level / insert items,
+  validated as a whole, one ack, behind `capabilities.batch`. The dLive
+  takes it too, so it is not an SQ-only path. Worth it for the cold sync
+  and for any preset that moves several strips at once, where today we
+  post one request each.
+- **`insert`** — an SQ input's insert, over MixPad. **Not to be built
+  into a public action yet:** it has not been checked on a desk through
+  the bridge, and the Pilot Tone SQ session is what clears it.
