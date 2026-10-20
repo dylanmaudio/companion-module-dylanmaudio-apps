@@ -837,3 +837,42 @@ A careless bridge is worse than any of these modules, because it locks out more.
 - #228 (the SQ's MixPad port);
 - #106 and #103 (a bridge on the LAN, for Pi users);
 - #102 (the Quick Reference's connection note).
+
+---
+
+## Appendix — the SQ desk test, 21 Oct 2026
+
+Module 1.1.91 (the 1.1.90 test line) against MIDI Bridge 1.4.92 on an
+SQ-5, `verified_on_desk: true`. The operator was at the desk.
+
+**Worked:**
+
+- **Mute write and mirror.** A MUTE press moved `mute_ch1` false → true
+  and the bridge's `tx_total` by exactly one message. Unmute returned it.
+- **Scene recall.** Scene 2 → 1 → 2, one message each, and
+  `scene_current` followed.
+- **Names, live from MixPad.** `input.1.name` read "jn1" on Scene 2, and
+  the whole set changed with the recall — Scene 1 has default names, so
+  84 name paths went empty but for ST1/ST2/ST3/USB, each marked
+  `default_name: true`. Names track a scene recall without being asked.
+
+**Correctly refused, zero bytes to the desk:** every fader nudge, by the
+dLive-scale guard.
+
+**Found, and fixed before anything reached the console:** the first build
+opened the per-op gate but `applyConsoleState` still forced the
+connection to `failure`, so `state.connected` stayed false and every
+feedback on the page would have read as disconnected.
+
+**For 1.2.0:**
+
+- **`default_name` is not used yet.** On Scene 1 the module shows an
+  empty `name_ch1` where it should fall back to its own label and number
+  ("Input 1"). The bridge already sends the flag.
+- **The SQ has no scene path in the mirror** (490 paths, none for scene),
+  because the desk reports a scene only when one is recalled. Nothing can
+  restore a previous scene by itself, so a recall preset on an SQ can't
+  offer an undo.
+- **Cold sync runs on a verified family and costs ~138 messages** of
+  dLive-shaped Gets. Harmless reads, but they should become the family's
+  own addresses before this is anything but a test build.
