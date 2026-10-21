@@ -905,3 +905,24 @@ With the dB path in, against MIDI Bridge 1.4.92 on the SQ-5:
 - **`insert`** — an SQ input's insert, over MixPad. **Not to be built
   into a public action yet:** it has not been checked on a desk through
   the bridge, and the Pilot Tone SQ session is what clears it.
+
+### Linked pairs on the SQ, verified 21 Oct (module 1.1.93)
+
+The operator noticed a channel picker stepping 1, 2, 3 across a linked
+1-2 pair. The bridge had been reporting the link all along:
+
+```
+input.1.stereo = {"linked": true, "half": "A", "partner": 2}
+input.2.stereo = {"linked": true, "half": "B", "partner": 1}
+```
+
+Read into the module and confirmed on the desk: inputs 1-2 and 3-4 are
+both linked, each half naming the other.
+
+**The B half has no fader of its own.** `input.2.fader` and
+`input.4.fader` are absent from the mirror — a linked pair has one
+fader between them. So before this, channel 2 read as a strip with no
+level and no reason given. With the link known, a key pointed at a B
+half can show its partner's level instead of a blank.
+
+Not SQ-only: a dLive links pairs too, and the same paths carry it.
