@@ -2,6 +2,16 @@
 
 ## Unreleased (1.1.9x test line, not for the store)
 
+- **Linked stereo pairs are no longer invisible** (#268). MIDI Bridge
+  reports `{linked, half, partner}` per strip and the module was dropping
+  it, so a pair looked like two unrelated strips: a fader move on one
+  half showed nothing on the other, and a channel picker stepped through
+  both halves of a pair. It now lands at connect with the rest of the
+  mirror. New per-strip variables `linked_*` and `partner_*`, and three
+  feedbacks — partner number, half (A/B), and is-linked. The partner
+  feedback takes an expression index on purpose: a picker needs the
+  partner of whichever channel it is pointed at, and Companion can't
+  nest `$(dlive:partner_ch$(custom:ch))`.
 - **Levels on a console that isn't a dLive.** A fader was a 0–127 dLive
   wire value all the way down, which is unity here and near silence on a
   14-bit desk. The level a caller asks for now carries its own scale —

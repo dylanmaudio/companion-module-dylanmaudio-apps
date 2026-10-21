@@ -871,6 +871,22 @@ export function deltaToEvent(path: string, value: unknown): ConsoleEvent | undef
 			if (!Number.isInteger(lv) || lv < 0 || lv > 127) return undefined
 			return { kind: 'fader', ...ref, level: lv }
 		}
+		case 'stereo': {
+			// {linked, half, partner} — the desk's own pairing. A linked pair
+			// moves together, so a module that ignores this shows a fader move
+			// on one half and nothing on the other.
+			if (typeof value !== 'object' || value === null) return undefined
+			const o = value as { linked?: unknown; half?: unknown; partner?: unknown }
+			const half = o.half === 'A' || o.half === 'B' ? o.half : undefined
+			const partner = Number(o.partner)
+			return {
+				kind: 'stereo',
+				...ref,
+				linked: o.linked === true,
+				half,
+				partner: Number.isInteger(partner) && partner > 0 ? partner : undefined,
+			}
+		}
 		case 'name':
 			return { kind: 'name', ...ref, name: typeof value === 'string' ? value : '' }
 		case 'colour':

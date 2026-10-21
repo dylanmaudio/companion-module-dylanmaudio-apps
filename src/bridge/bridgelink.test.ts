@@ -563,6 +563,32 @@ describe('BridgeLink', () => {
 		expect(changes.flat()).toContain('connection')
 	})
 
+	it("reads the desk's stereo link", () => {
+		// seen on the SQ-5, 21 Oct: inputs 1 and 2 linked
+		expect(deltaToEvent('input.1.stereo', { linked: true, half: 'A', partner: 2 })).toEqual({
+			kind: 'stereo',
+			type: 'input',
+			index: 1,
+			linked: true,
+			half: 'A',
+			partner: 2,
+		})
+		expect(deltaToEvent('input.3.stereo', { linked: false })).toEqual({
+			kind: 'stereo',
+			type: 'input',
+			index: 3,
+			linked: false,
+			half: undefined,
+			partner: undefined,
+		})
+		// a half we don't recognise is dropped rather than guessed at
+		expect(deltaToEvent('input.1.stereo', { linked: true, half: 'M', partner: 0 })).toMatchObject({
+			half: undefined,
+			partner: undefined,
+		})
+		expect(deltaToEvent('input.1.stereo', 'yes')).toBeUndefined()
+	})
+
 	it('deltaToEvent rejects junk honestly', () => {
 		expect(deltaToEvent('input.5.fader', { lv: 95, db: -6.1 })).toEqual({
 			kind: 'fader',

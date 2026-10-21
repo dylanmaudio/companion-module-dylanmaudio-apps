@@ -24,6 +24,7 @@ import {
 	SCENE_PATH,
 	colourPath,
 	faderPath,
+	stereoPath,
 	mixPath,
 	mutePath,
 	namePath,
@@ -126,6 +127,44 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 				if (th === undefined) return false
 				if (th === null) return db !== null
 				return db !== null && db >= th
+			}, false),
+			unsubscribe,
+		},
+		stereo_partner: {
+			type: 'value',
+			name: 'Linked partner (number)',
+			description:
+				"The number of the strip this one is linked to, or 0. Read it into a local variable to step a channel picker past the other half of a pair — a plain variable can't be nested.",
+			options: [...channelFields({ types: CHOICES_FADER_TYPES })],
+			callback: watch((o, reg) => {
+				const ref = strip(o, reg)
+				reg(stereoPath(ref))
+				return link.state.strip(ref).stereo?.partner ?? 0
+			}, 0),
+			unsubscribe,
+		},
+		stereo_half: {
+			type: 'value',
+			name: 'Linked half (A / B / empty)',
+			description: 'Which half of a linked pair this strip is. Empty when it is not linked.',
+			options: [...channelFields({ types: CHOICES_FADER_TYPES })],
+			callback: watch((o, reg) => {
+				const ref = strip(o, reg)
+				reg(stereoPath(ref))
+				const st = link.state.strip(ref).stereo
+				return st?.linked ? (st.half ?? '') : ''
+			}, ''),
+			unsubscribe,
+		},
+		stereo_linked: {
+			type: 'boolean',
+			name: 'Strip is half of a linked pair',
+			defaultStyle: { bgcolor: GREEN, color: WHITE },
+			options: [...channelFields({ types: CHOICES_FADER_TYPES })],
+			callback: watch((o, reg) => {
+				const ref = strip(o, reg)
+				reg(stereoPath(ref))
+				return link.state.strip(ref).stereo?.linked === true
 			}, false),
 			unsubscribe,
 		},

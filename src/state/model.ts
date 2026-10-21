@@ -31,6 +31,12 @@ export interface StripState {
 	/** the wire value: a dLive lv (0-127), or another family's own units */
 	level: number | undefined
 	/**
+	 * The desk's stereo link for this strip, where it reports one. A linked
+	 * pair moves together on the desk, so treating the halves as independent
+	 * strips is how a module shows a fader move on one and not the other.
+	 */
+	stereo: { linked: boolean; half: 'A' | 'B' | undefined; partner: number | undefined } | undefined
+	/**
 	 * dB as the desk itself reports it, where it does (`{wire, db, steps}`).
 	 * On a dLive this stays undefined and dB is derived from `level` through
 	 * the measured table; on another family there is no such table here, so
@@ -59,6 +65,10 @@ export function mutePath(ref: ChannelRef): string {
 }
 export function faderPath(ref: ChannelRef): string {
 	return `fader/${channelKey(ref)}`
+}
+
+export function stereoPath(ref: ChannelRef): string {
+	return `stereo/${channelKey(ref)}`
 }
 export function namePath(ref: ChannelRef): string {
 	return `name/${channelKey(ref)}`
@@ -101,6 +111,7 @@ export class ConsoleState {
 				mute: undefined,
 				level: undefined,
 				db: undefined,
+				stereo: undefined,
 				params: new Map(),
 				sends: new Map(),
 				mixes: new Map(),
@@ -156,6 +167,13 @@ export class ConsoleState {
 				if (s.mute === ev.on) return []
 				s.mute = ev.on
 				return [mutePath(ev)]
+			}
+			case 'stereo': {
+				const s = this.strip(ev)
+				const was = s.stereo
+				if (was && was.linked === ev.linked && was.half === ev.half && was.partner === ev.partner) return []
+				s.stereo = { linked: ev.linked, half: ev.half, partner: ev.partner }
+				return [stereoPath(ev)]
 			}
 			case 'fader': {
 				const s = this.strip(ev)
@@ -294,6 +312,8 @@ export function eventPaths(ev: ConsoleEvent): string[] {
 			return [mutePath(ev)]
 		case 'fader':
 			return [faderPath(ev)]
+		case 'stereo':
+			return [stereoPath(ev)]
 		case 'fader_ping':
 		case 'cc':
 		case 'strip_fader':

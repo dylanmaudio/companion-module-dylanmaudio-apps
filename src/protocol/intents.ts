@@ -103,6 +103,17 @@ export const INTENT_TIER: Record<IntentOp, 'hardware' | 'two-impl' | 'single' | 
 export type ConsoleEvent =
 	| { kind: 'mute'; type: ChannelType; index: number; on: boolean }
 	| {
+			kind: 'stereo'
+			type: ChannelType
+			index: number
+			/** the desk links this strip to a partner */
+			linked: boolean
+			/** which half of the pair it is, where the desk says */
+			half: 'A' | 'B' | undefined
+			/** the partner's index on the same type, where the desk says */
+			partner: number | undefined
+	  }
+	| {
 			kind: 'fader'
 			type: ChannelType
 			index: number

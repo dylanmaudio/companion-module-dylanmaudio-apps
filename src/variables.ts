@@ -98,7 +98,9 @@ export function variableDefinitions(
 		defs[stripVar('mute', ref)] = { name: `${label} mute (true/false)` }
 		if (ref.type !== 'mute_group') {
 			defs[stripVar('fader', ref)] = { name: `${label} fader (dB)` }
-			defs[stripVar('fader_lv', ref)] = { name: `${label} fader (0–127)` }
+			defs[stripVar('fader_lv', ref)] = { name: `${label} fader (wire value)` }
+			defs[stripVar('linked', ref)] = { name: `${label} is half of a linked pair (true/false)` }
+			defs[stripVar('partner', ref)] = { name: `${label} linked partner's number` }
 		}
 	}
 	for (const n of sceneNumbers) defs[`scene_name_${n}`] = { name: `Scene ${n} name` }
@@ -148,6 +150,8 @@ export function stripValues(state: ConsoleState, ref: ChannelRef): CompanionVari
 	if (ref.type !== 'mute_group') {
 		v[stripVar('fader', ref)] = fmtDb(stripDb(s))
 		v[stripVar('fader_lv', ref)] = s.level ?? ''
+		v[stripVar('linked', ref)] = s.stereo?.linked ?? false
+		v[stripVar('partner', ref)] = s.stereo?.partner ?? ''
 	}
 	return v
 }
@@ -188,6 +192,12 @@ export function valuesForPaths(
 				if (ref.type !== 'mute_group') {
 					v[stripVar('fader', ref)] = fmtDb(stripDb(s))
 					v[stripVar('fader_lv', ref)] = s.level ?? ''
+				}
+				break
+			case 'stereo':
+				if (ref.type !== 'mute_group') {
+					v[stripVar('linked', ref)] = s.stereo?.linked ?? false
+					v[stripVar('partner', ref)] = s.stereo?.partner ?? ''
 				}
 				break
 		}

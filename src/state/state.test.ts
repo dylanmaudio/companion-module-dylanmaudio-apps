@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ConsoleState, eventPaths, faderPath, mutePath, paramPath } from './model.js'
+import { ConsoleState, eventPaths, faderPath, stereoPath, mutePath, paramPath } from './model.js'
 import { SubscriptionRegistry } from './subscriptions.js'
 import { QueryScheduler } from './scheduler.js'
 import type { Intent } from '../protocol/intents.js'
@@ -15,6 +15,17 @@ describe('ConsoleState', () => {
 		expect(s.strip(ref).level).toBe(107)
 		expect(s.apply({ kind: 'fader_ping', ...ref })).toEqual([])
 	})
+	it('a stereo link lands, and an identical one is not a change', () => {
+		const s = new ConsoleState()
+		const ref = { type: 'input', index: 1 } as const
+		expect(s.apply({ kind: 'stereo', ...ref, linked: true, half: 'A', partner: 2 })).toEqual([stereoPath(ref)])
+		expect(s.strip(ref).stereo).toEqual({ linked: true, half: 'A', partner: 2 })
+		expect(s.apply({ kind: 'stereo', ...ref, linked: true, half: 'A', partner: 2 })).toEqual([])
+		expect(s.apply({ kind: 'stereo', ...ref, linked: false, half: undefined, partner: undefined })).toEqual([
+			stereoPath(ref),
+		])
+	})
+
 	it('first name learned counts as a change even if equal to the default', () => {
 		const s = new ConsoleState()
 		const ref = { type: 'input' as const, index: 3 }
