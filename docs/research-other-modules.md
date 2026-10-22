@@ -951,3 +951,18 @@ it in test builds only.
   `/Macros/Recall_Macro/<place>` (0-based) fires one over OSC and the
   desk pushes what it changed. Module side that is a "fire macro"
   action, blocked until the Client API carries an SD Action shape.
+
+  The shape is agreed (MIDI Bridge 1.4.106): the block's `actions` is
+  `{"noun": "Macro", "fields": [{"id": "macro", "min": 1, "max": 999}]}`
+  and the intent is `{"op": "action", "macro": n}`. **Build the Action
+  options from the block's `fields`, don't hard-code them** — but note
+  the catch: the dLive's block has **no `actions` key at all** (it
+  carries `scenes` and `triggers`), and the SQ's is null. So a purely
+  block-driven implementation would show an empty Action action on the
+  one family we drive today. The dLive's block needs to declare
+  `{"noun": "Action", "fields": [cc, value]}` first, which is a bridge
+  change complicated by that block being pinned to `fallback_profile`.
+
+  Module side, the `action` intent also stops being
+  `{op, cc, value}` and becomes whatever ids the block names, so the
+  `Intent` type's action variant has to open up.
