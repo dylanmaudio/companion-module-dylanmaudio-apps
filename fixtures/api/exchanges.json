@@ -20,7 +20,20 @@
       "response": {"status": 200, "body": {"console": {
         "driver": "dlive", "title": "dLive",
         "scenes": {"noun": "Scene", "first": 1, "last": 500},
-        "triggers": {"noun": "SoftKey", "id_prefix": "cc"}}}}
+        "triggers": {"noun": "SoftKey", "id_prefix": "cc"},
+        "actions": {"noun": "Action", "fields": [
+          {"id": "cc", "label": "CC #", "min": 0, "max": 127},
+          {"id": "value", "label": "Value", "min": 0, "max": 127}]}}}}
+    },
+    {
+      "id": "info.console.digico",
+      "note": "MIDI Bridge 1.4.106: the console block's `actions` declares an Action's fields, and {\"op\": \"action\", <field id>: value} takes them. The DiGiCo SD's is one Macro number, from 1; the dLive's is cc and value (info.console). `family` names the console the case runs against; the SD is offered in test builds only.",
+      "family": "digico",
+      "request": {"method": "GET", "path": "/api/v1/info"},
+      "response": {"status": 200, "body": {"console": {
+        "driver": "digico", "title": "DiGiCo",
+        "actions": {"noun": "Macro", "fields": [
+          {"id": "macro", "label": "Macro", "min": 1, "max": 999}]}}}}
     },
     {
       "id": "console.objects.not_supported",
