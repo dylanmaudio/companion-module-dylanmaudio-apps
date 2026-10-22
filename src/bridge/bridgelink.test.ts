@@ -563,6 +563,39 @@ describe('BridgeLink', () => {
 		expect(changes.flat()).toContain('connection')
 	})
 
+	it('ignores an SSE event kind it does not know, and still follows the sequence', async () => {
+		// The bridge gains kinds we have no use for — a midi feed, and `trigger`
+		// for a desk key that isn't MIDI (1.4.107, the Wing's user keys).
+		// Ignoring has to be free AND has to keep the seq moving, or a run of
+		// them would leave us thinking we had missed events.
+		link.stop()
+		const fresh = new BridgeLink({
+			host: '127.0.0.1',
+			port: bridge.port,
+			laneName: 'unknown-kinds',
+			baseChannel: 1,
+			retryMs: 50,
+		})
+		const logs: string[] = []
+		fresh.on('log', (level, msg) => logs.push(`${level}: ${msg}`))
+		const changed: string[][] = []
+		fresh.on('changed', (p) => changed.push(p))
+		fresh.start()
+		await waitFor(() => bridge.streamOpen, 'stream')
+		changed.length = 0
+
+		bridge.pushEvent('trigger', { trigger: 'user:U1.1', value: 127, family: 'wing' })
+		bridge.pushEvent('midi', { hex: '90 40 7f' })
+		await new Promise((r) => setTimeout(r, 150))
+		expect(changed).toEqual([])
+		expect(logs.filter((l) => l.startsWith('warn:') || l.startsWith('error:'))).toEqual([])
+
+		// a known event straight after still lands: the stream wasn't disturbed
+		bridge.pushEvent('scene', { number: 7 })
+		await waitFor(() => fresh.state.currentScene === 7, 'scene after the unknown kinds')
+		fresh.stop()
+	})
+
 	it("reads the desk's stereo link", () => {
 		// seen on the SQ-5, 21 Oct: inputs 1 and 2 linked
 		expect(deltaToEvent('input.1.stereo', { linked: true, half: 'A', partner: 2 })).toEqual({
