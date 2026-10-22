@@ -926,3 +926,28 @@ level and no reason given. With the link known, a key pointed at a B
 half can show its partner's level instead of a blank.
 
 Not SQ-only: a dLive links pairs too, and the same paths carry it.
+
+### The DiGiCo SD, measured 22 Oct (not driven by this module)
+
+From `sim/captures/2026-10-22-digico-attended/RESULTS.md` on the SD11.
+Recorded here because it is a third shape of the coexistence problem
+§5.3 is about, not because the module drives an SD — MIDI Bridge offers
+it in test builds only.
+
+- **Only one DiGiCo Pad device can be enabled at a time** (#250).
+  Enabling a second switches the first off *by itself*, with no error.
+  So Bitfocus's DiGiCo OSC module and MIDI Bridge cannot both have
+  feedback from one SD: the user picks one. The desk also refuses two
+  entries on the same ports, though a write from any port of the
+  registered IP is accepted.
+
+  That is worse than the dLive's four connections and worse than the
+  SQ's one, because the SQ at least leaves the loser visibly unserved:
+  here the *winner* changes silently under whoever set it up first. If
+  the module ever drives an SD, HELP needs this before anything else.
+
+- **SD macros are a wanted action** (#285), in the operator's words:
+  "We could also use them for streamdeck control through companions".
+  `/Macros/Recall_Macro/<place>` (0-based) fires one over OSC and the
+  desk pushes what it changed. Module side that is a "fire macro"
+  action, blocked until the Client API carries an SD Action shape.
