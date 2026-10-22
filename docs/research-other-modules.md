@@ -955,13 +955,20 @@ it in test builds only.
   The shape is agreed (MIDI Bridge 1.4.106): the block's `actions` is
   `{"noun": "Macro", "fields": [{"id": "macro", "min": 1, "max": 999}]}`
   and the intent is `{"op": "action", "macro": n}`. **Build the Action
-  options from the block's `fields`, don't hard-code them** — but note
-  the catch: the dLive's block has **no `actions` key at all** (it
-  carries `scenes` and `triggers`), and the SQ's is null. So a purely
-  block-driven implementation would show an empty Action action on the
-  one family we drive today. The dLive's block needs to declare
-  `{"noun": "Action", "fields": [cc, value]}` first, which is a bridge
-  change complicated by that block being pinned to `fallback_profile`.
+  options from the block's `fields`, don't hard-code them** — and the
+  dLive already declares its own, so one implementation serves both.
+  `shared/target/dlive/driver.py`'s `client_profile()` returns
+  `{"noun": "Action", "fields": [cc 0-127, value 0-127]}` beside
+  `scenes` and `triggers`, and has since 14 Oct. The SQ's `null` is
+  correct: an SQ has no MIDI Actions.
+
+  **Careful reading `fixtures/api/exchanges.json` for this.** Its hello
+  exchange carries a *subset* of the console block — driver, title,
+  scenes, triggers — so `actions` looks absent there when it is not. I
+  concluded from the fixture that the dLive declared no Actions, and
+  was wrong. Absent from a fixture is not absent on the wire, and the
+  fixture being a subset also means a module test built on it would not
+  catch an Actions regression. Worth completing for both reasons.
 
   Module side, the `action` intent also stops being
   `{op, cc, value}` and becomes whatever ids the block names, so the
