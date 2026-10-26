@@ -66,8 +66,16 @@ const GATED = new Set(['send_level'])
  */
 const SCALED_OPS = new Set(['fader', 'fade', 'send_level', 'get_fader', 'get_send_level'])
 
-/** The console families this build drives, declared at hello (Client API §1b). */
-const CONSOLES = ['dlive', 'sq']
+/**
+ * The console families this build will write to at all, declared at hello
+ * (Client API §1b). A bridge from 1.4.93 refuses writes from a client that
+ * didn't say, on any family but the dLive.
+ *
+ * Naming one here is not a claim that it works: the per-op gate still needs
+ * the bridge's own `verified_on_desk` for that family, and still refuses a
+ * dLive-scaled value or a dLive byte on any of them.
+ */
+const CONSOLES = ['dlive', 'sq', 'wing', 'digico']
 
 /** Gets in flight during a cold sync: enough to be quick, not a spray (client API §11). */
 const COLD_SYNC_LANES = 4

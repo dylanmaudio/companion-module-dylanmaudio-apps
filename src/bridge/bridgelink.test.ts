@@ -755,7 +755,7 @@ describe('BridgeLink', () => {
 			})
 			fresh.start()
 			await waitFor(() => bridge.hellos.length > 0, 'hello')
-			expect(bridge.hellos[0].consoles).toEqual(['dlive', 'sq'])
+			expect(bridge.hellos[0].consoles).toEqual(['dlive', 'sq', 'wing', 'digico'])
 			fresh.stop()
 		})
 
