@@ -146,6 +146,15 @@ export function foreignFamily(info: Record<string, unknown>): string | null {
 	return typeof title === 'string' && title !== '' ? title : driver
 }
 
+/** This console names its scenes by number (the DiGiCo SD), not by place. */
+export function sceneByNumber(info: Record<string, unknown>): boolean {
+	const block = info.console
+	if (typeof block !== 'object' || block === null) return false
+	const scenes = (block as { scenes?: unknown }).scenes
+	if (typeof scenes !== 'object' || scenes === null) return false
+	return (scenes as { by_number?: unknown }).by_number === true
+}
+
 /** The bridge says this console's driver has been run against a real desk. */
 export function familyVerified(info: Record<string, unknown>): boolean {
 	const block = info.console
@@ -199,6 +208,8 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	private foreignFamily: string | null = null
 	/** the bridge says this family's driver has been run against a real desk */
 	private familyVerified = false
+	/** this desk names its scenes by number, not by place in a list */
+	private sceneByNumber = false
 	private saidForeign = false
 	private readonly saidScaled = new Set<string>()
 	private baseN: number
@@ -272,6 +283,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			return false
 		}
 		if (this.refuseForeign(intent.op)) return false
+		if (intent.op === 'scene' && this.refuseSceneByNumber()) return false
 		void this.postIntent(intent)
 		const local = localEvent(intent)
 		if (local) {
@@ -341,6 +353,29 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			return
 		}
 		void this.postCmd({ op: 'fade', type: ref.type, index: ref.index, to_lv: toLv, over_ms: ms })
+	}
+
+	/**
+	 * A scene recall we would send as a place, to a desk that names its scenes
+	 * by number.
+	 *
+	 * Our `scene` op carries an integer, and the bridge's SD driver takes it as
+	 * the place in the snapshot list. On the SD11 of 27 Oct the list ran 1.00,
+	 * 1.01, 1.03, 1.93, 2.83 — so a key labelled "Scene 4" would have recalled
+	 * 1.93, which the desk calls '2'. That is not a missing feature, it is the
+	 * wrong snapshot during a show, and it is the same hazard as #55.
+	 *
+	 * So we send nothing until the module can address a scene by its number.
+	 */
+	private refuseSceneByNumber(): boolean {
+		if (!this.sceneByNumber) return false
+		this.sayOnce(
+			'scene_by_number',
+			`Scene recall isn't sent to a ${this.foreignFamily ?? 'console'} that numbers its scenes: ours would be the ` +
+				`position in the list, not the number on the desk, so "4" could recall a different scene entirely. ` +
+				`Recalling by number is coming; until then use the desk or its own macros.`,
+		)
+		return true
 	}
 
 	/** One log line per reason, not one per press. */
@@ -550,6 +585,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		this.caps = info.json.capabilities ?? {}
 		this.foreignFamily = foreignFamily(info.json)
 		this.familyVerified = familyVerified(info.json)
+		this.sceneByNumber = sceneByNumber(info.json)
 
 		// 2. hello
 		await this.hello()

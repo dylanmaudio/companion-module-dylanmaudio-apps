@@ -630,6 +630,65 @@ describe('BridgeLink', () => {
 		fresh.stop()
 	})
 
+	it('refuses a scene recall on a desk that numbers its scenes', async () => {
+		// The SD11 of 27 Oct listed 1.00, 1.01, 1.03, 1.93, 2.83. Our op sends an
+		// integer, which that bridge reads as the PLACE, so a key labelled
+		// "Scene 4" would have recalled 1.93 — the snapshot the desk calls '2'.
+		// Sending the wrong scene during a show is #55 again, so we send nothing.
+		link.stop()
+		bridge.console = {
+			driver: 'digico',
+			title: 'DiGiCo',
+			verified_on_desk: true,
+			scenes: { noun: 'Snapshot', first: 1, last: null, by_number: true },
+		}
+		bridge.cmds.length = 0
+		const fresh = new BridgeLink({
+			host: '127.0.0.1',
+			port: bridge.port,
+			laneName: 'sd-scene',
+			baseChannel: 1,
+			retryMs: 50,
+		})
+		const logs: string[] = []
+		fresh.on('log', (level, msg) => logs.push(`${level}: ${msg}`))
+		fresh.start()
+		await waitFor(() => fresh.status === 'ok', 'ok')
+
+		expect(fresh.send({ op: 'scene', scene: 4 })).toBe(false)
+		// a mute on the same desk still travels: only the recall is held back
+		expect(fresh.send({ op: 'mute', type: 'input', index: 8, on: true })).toBe(true)
+		await waitFor(() => bridge.cmds.some((c) => (c.body.intent as { op?: string }).op === 'mute'), 'mute')
+		await new Promise((r) => setTimeout(r, 80))
+		expect(bridge.cmds.map((c) => (c.body.intent as { op?: string }).op)).not.toContain('scene')
+		expect(logs.some((l) => l.includes('numbers its scenes'))).toBe(true)
+		fresh.stop()
+	})
+
+	it('still recalls by place on a desk that lists its scenes', async () => {
+		// the dLive and the SQ: no by_number, so a recall is unchanged
+		link.stop()
+		bridge.console = {
+			driver: 'sq',
+			title: 'SQ',
+			verified_on_desk: true,
+			scenes: { noun: 'Scene', first: 1, last: 300 },
+		}
+		bridge.cmds.length = 0
+		const fresh = new BridgeLink({
+			host: '127.0.0.1',
+			port: bridge.port,
+			laneName: 'sq-scene',
+			baseChannel: 1,
+			retryMs: 50,
+		})
+		fresh.start()
+		await waitFor(() => fresh.status === 'ok', 'ok')
+		expect(fresh.send({ op: 'scene', scene: 4 })).toBe(true)
+		await waitFor(() => bridge.cmds.some((c) => (c.body.intent as { op?: string }).op === 'scene'), 'scene')
+		fresh.stop()
+	})
+
 	it("reads the desk's stereo link", () => {
 		// seen on the SQ-5, 21 Oct: inputs 1 and 2 linked
 		expect(deltaToEvent('input.1.stereo', { linked: true, half: 'A', partner: 2 })).toEqual({
