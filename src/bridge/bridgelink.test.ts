@@ -52,6 +52,8 @@ class MockBridge {
 	rejectCmdOnceWith: number | null = null
 	/** the error code that rejection carries (default: what a reaped lane gets) */
 	rejectCode: string | null = null
+	/** reject once with a bare status and no {ok:false} body — a proxy's error page */
+	rejectCmdOnceBare: number | null = null
 	/** answer hello with this instead (a token the bridge won't take) */
 	refuseHello: { status: number; body: Record<string, unknown> } | null = null
 	cmdDelayMs = 0
@@ -154,6 +156,13 @@ class MockBridge {
 		}
 		if (url.pathname === '/api/v1/cmd') {
 			if (this.cmdDelayMs) await new Promise((r) => setTimeout(r, this.cmdDelayMs))
+			if (this.rejectCmdOnceBare !== null) {
+				const status = this.rejectCmdOnceBare
+				this.rejectCmdOnceBare = null
+				res.writeHead(status, { 'Content-Type': 'text/html' })
+				res.end('<html><body>Service Unavailable</body></html>')
+				return
+			}
 			if (this.rejectCmdOnceWith !== null) {
 				const status = this.rejectCmdOnceWith
 				this.rejectCmdOnceWith = null
@@ -593,6 +602,31 @@ describe('BridgeLink', () => {
 		// a known event straight after still lands: the stream wasn't disturbed
 		bridge.pushEvent('scene', { number: 7 })
 		await waitFor(() => fresh.state.currentScene === 7, 'scene after the unknown kinds')
+		fresh.stop()
+	})
+
+	it('says so when a press is refused without an {ok:false} envelope', async () => {
+		// A self-clearing 503 <op>_unavailable (#318) arrives as {ok:false} and
+		// is already logged. A proxy's error page is not, and without this the
+		// press would vanish with nothing in the log at all.
+		link.stop()
+		bridge.rejectCmdOnceBare = 503
+		const fresh = new BridgeLink({
+			host: '127.0.0.1',
+			port: bridge.port,
+			laneName: 'bare-503',
+			baseChannel: 1,
+			retryMs: 50,
+		})
+		const logs: string[] = []
+		fresh.on('log', (level, msg) => logs.push(`${level}: ${msg}`))
+		fresh.start()
+		await waitFor(() => fresh.isOk, 'ok')
+		fresh.send({ op: 'mute', type: 'input', index: 1, on: true })
+		await waitFor(() => logs.some((l) => l.includes('HTTP 503')), 'the refusal is logged')
+		expect(logs.find((l) => l.includes('HTTP 503'))).toMatch(/^warn: Bridge rejected mute/)
+		// not a transport failure: no reconnect, no "didn't reach MIDI Bridge"
+		expect(logs.some((l) => l.includes("didn't reach"))).toBe(false)
 		fresh.stop()
 	})
 

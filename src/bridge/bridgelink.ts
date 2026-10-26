@@ -436,8 +436,19 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			if (json.ok === false) {
 				this.stats.cmdsFailed++
 				const err = errorOf(json)
+				// capability_off and unsupported_op are settled states: this stays
+				// off until something is changed. Everything else lost a press,
+				// including the self-clearing 503 <op>_unavailable (#318) — the
+				// operator needs to know it didn't land, and we deliberately do
+				// not retry: a scene recall arriving late is its own hazard.
 				const level = err.code === 'capability_off' || err.code === 'unsupported_op' ? 'info' : 'warn'
 				this.emit('log', level, `Bridge rejected ${op}: ${err.code ?? status}${err.message ? ` (${err.message})` : ''}`)
+			} else if (status < 200 || status >= 300) {
+				// A refusal the bridge didn't phrase as {ok: false} — a proxy's
+				// error page, a 503 with no JSON. Without this the press vanishes
+				// with nothing in the log at all.
+				this.stats.cmdsFailed++
+				this.emit('log', 'warn', `Bridge rejected ${op}: HTTP ${status}`)
 			}
 		} catch (e) {
 			this.stats.cmdsFailed++
