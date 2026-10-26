@@ -182,6 +182,8 @@ export class ConsoleState {
 				s.db = ev.db
 				return [faderPath(ev)]
 			}
+			// (a desk that reports dB only leaves `level` undefined, which is
+			// what fader_lv_* then shows: unknown, not zero)
 			// Events, not channel state: a ping carries no value, and CC / strip
 			// traffic belongs to whatever is triggering on it, not to the mirror.
 			case 'fader_ping':

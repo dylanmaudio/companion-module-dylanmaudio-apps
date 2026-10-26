@@ -117,8 +117,12 @@ export type ConsoleEvent =
 			kind: 'fader'
 			type: ChannelType
 			index: number
-			/** wire value: a dLive lv, or another family's own units */
-			level: number
+			/**
+			 * The wire value: a dLive lv, or another family's own units.
+			 * Absent where the desk reports only dB — the DiGiCo SD sends
+			 * `{db, steps: null}` with no wire value at all.
+			 */
+			level?: number
 			/** dB as the desk reported it, where it does; undefined on a dLive */
 			db?: number | null
 	  }

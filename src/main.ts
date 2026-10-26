@@ -449,6 +449,8 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 				uid = `mute:${ev.type}/${ev.index}`
 				break
 			case 'fader': {
+				// a desk that reports dB only has no lv to convert
+				if (ev.level === undefined) return
 				const db = lvToDb(ev.level)
 				rec = {
 					actionId: 'fader',

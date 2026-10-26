@@ -876,15 +876,23 @@ export function deltaToEvent(path: string, value: unknown): ConsoleEvent | undef
 			// because the taper that produced it lives on the desk.
 			if (typeof value === 'object' && value !== null) {
 				const o = value as { lv?: unknown; wire?: unknown; db?: unknown; steps?: unknown }
-				if (o.wire !== undefined) {
-					const wire = Number(o.wire)
-					if (!Number.isFinite(wire)) return undefined
-					const db = o.db === null ? null : Number(o.db)
-					return { kind: 'fader', ...ref, level: wire, db: db === null || Number.isFinite(db) ? db : undefined }
+				// The dLive's shape, and only it, uses our measured table: its own
+				// db is ignored because ours is calibrated against that taper.
+				if (o.lv !== undefined) {
+					const lv = Number(o.lv)
+					if (!Number.isInteger(lv) || lv < 0 || lv > 127) return undefined
+					return { kind: 'fader', ...ref, level: lv }
 				}
-				const lv = Number(o.lv)
-				if (!Number.isInteger(lv) || lv < 0 || lv > 127) return undefined
-				return { kind: 'fader', ...ref, level: lv }
+				// Everyone else reports dB, which is the portable part. A wire
+				// value may come with it (the SQ: {wire, db, steps}) or may not
+				// (the DiGiCo SD: {db, steps: null}). Keying off `wire` dropped
+				// the SD's levels silently — found on an SD11, 27 Oct.
+				const db = o.db === null ? null : Number(o.db)
+				if (db !== null && !Number.isFinite(db)) return undefined
+				const wire = o.wire === undefined ? undefined : Number(o.wire)
+				if (wire !== undefined && !Number.isFinite(wire)) return undefined
+				if (o.db === undefined && wire === undefined) return undefined
+				return { kind: 'fader', ...ref, level: wire, db }
 			}
 			const lv = Number(value)
 			if (!Number.isInteger(lv) || lv < 0 || lv > 127) return undefined
