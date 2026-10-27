@@ -283,9 +283,9 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			return false
 		}
 		if (this.refuseForeign(intent.op)) return false
-		if (intent.op === 'scene' && this.refuseSceneByNumber()) return false
-		void this.postIntent(intent)
-		const local = localEvent(intent)
+		const outgoing = intent.op === 'scene' ? this.sceneForConsole(intent) : intent
+		void this.postIntent(outgoing)
+		const local = localEvent(outgoing)
 		if (local) {
 			const changed = this.state.apply(local)
 			if (changed.length) this.emit('changed', changed)
@@ -356,26 +356,31 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	}
 
 	/**
-	 * A scene recall we would send as a place, to a desk that names its scenes
-	 * by number.
+	 * Address a scene the way this console does, and send only that key.
 	 *
-	 * Our `scene` op carries an integer, and the bridge's SD driver takes it as
-	 * the place in the snapshot list. On the SD11 of 27 Oct the list ran 1.00,
-	 * 1.01, 1.03, 1.93, 2.83 — so a key labelled "Scene 4" would have recalled
-	 * 1.93, which the desk calls '2'. That is not a missing feature, it is the
-	 * wrong snapshot during a show, and it is the same hazard as #55.
+	 * A dLive, SQ or Wing counts its scenes: `scene` is the position down the
+	 * list. A DiGiCo numbers them, and the number carries decimals — on the
+	 * SD11 of 27 Oct the list ran 1.00, 1.01, 1.03, 1.93, 2.83, so "Scene 4"
+	 * as a place recalls 1.93, the snapshot the desk calls '2'. That is the
+	 * wrong snapshot during a show, the same hazard as #55.
 	 *
-	 * So we send nothing until the module can address a scene by its number.
+	 * Whichever key does not apply is REMOVED, never left to ride along: a
+	 * `scene` reaching a by_number driver is exactly the place-based recall
+	 * this exists to stop, and the driver would have no way to know we meant
+	 * otherwise. The bridge refuses a number no snapshot has, or one that two
+	 * share, or any recall taken while it is re-reading the list (MIDI Bridge
+	 * 1.4.111, #289), and that refusal is logged.
 	 */
-	private refuseSceneByNumber(): boolean {
-		if (!this.sceneByNumber) return false
-		this.sayOnce(
-			'scene_by_number',
-			`Scene recall isn't sent to a ${this.foreignFamily ?? 'console'} that numbers its scenes: ours would be the ` +
-				`position in the list, not the number on the desk, so "4" could recall a different scene entirely. ` +
-				`Recalling by number is coming; until then use the desk or its own macros.`,
-		)
-		return true
+	private sceneForConsole(intent: Extract<Intent, { op: 'scene' }>): Intent {
+		if (!this.sceneByNumber) {
+			const { scene_number: _unused, ...byPlace } = intent
+			return byPlace
+		}
+		// An empty box falls back to the Scene field, so a button built before
+		// this option existed recalls the number its own label claims.
+		const number = intent.scene_number ?? intent.scene
+		const { scene: _place, ...rest } = intent
+		return { ...rest, scene_number: number } as Intent
 	}
 
 	/** One log line per reason, not one per press. */

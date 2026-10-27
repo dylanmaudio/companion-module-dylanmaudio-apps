@@ -24,7 +24,7 @@ import {
 	stepFromDb,
 	stepLv,
 } from './protocol/levels.js'
-import type { PeqParam } from './protocol/intents.js'
+import type { Intent, PeqParam } from './protocol/intents.js'
 import { faderPath, mutePath, paramPath, preampPath, sendPath } from './state/model.js'
 import {
 	CHOICES_ASSIGNABLE_TYPES,
@@ -51,6 +51,26 @@ function num(o: Opts, key: string, dflt = 0): number {
 	const v = o[key]
 	const n = typeof v === 'number' ? v : Number(v)
 	return Number.isFinite(n) ? n : dflt
+}
+
+/**
+ * Scene recall carries two option ids, and which one travels is decided at
+ * run time by the console, not here: BridgeLink sends `scene` on a desk that
+ * counts its scenes and `scene_number` on one that numbers them.
+ *
+ * The frozen `scene` id keeps its meaning. `scene_number` is the new id, for
+ * the decimals a DiGiCo allows ("1.5"), and an empty one falls back to
+ * `scene` so an existing button recalls the number its label already claims.
+ */
+function sceneIntent(o: Opts): Intent {
+	const typed = str(o, 'scene_number').trim()
+	if (typed !== '') {
+		const n = Number(typed)
+		if (!Number.isFinite(n) || n <= 0) throw new Error(`"${typed}" is not a scene number (try 4 or 1.5)`)
+		return { op: 'scene', scene_number: n, scene: Math.round(num(o, 'scene', 1)) }
+	}
+	const scene = Math.round(num(o, 'scene', 1))
+	return { op: 'scene', scene_number: scene, scene }
 }
 
 function str(o: Opts, key: string, dflt = ''): string {
@@ -547,8 +567,19 @@ export function buildActions(ctx: ModuleContext): CompanionActionDefinitions<Act
 					min: 1,
 					max: 500,
 				},
+				{
+					type: 'textinput',
+					id: 'scene_number',
+					label: 'Or the number on the desk',
+					tooltip:
+						'Only used on a console that numbers its scenes, such as a DiGiCo, where an inserted ' +
+						'snapshot is numbered 1.50. Leave this empty and the Scene field above is used as the ' +
+						'number. Accepts an expression.',
+					default: '',
+					useVariables: true,
+				},
 			],
-			callback: run((o) => link.send({ op: 'scene', scene: Math.round(num(o, 'scene', 1)) })),
+			callback: run((o) => link.send(sceneIntent(o))),
 		},
 		scene_go: {
 			name: 'Scene: Go (cue list) — needs the Surface socket',

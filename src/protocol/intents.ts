@@ -18,7 +18,11 @@ export type Intent =
 	| { op: 'peq'; type: ChannelType; index: number; band: number; param: PeqParam; value: number }
 	| { op: 'hpf_freq'; index: number; value: number }
 	| { op: 'hpf_on'; index: number; on: boolean }
-	| { op: 'scene'; scene: number }
+	// `scene` is the position down the list, counting from 1. `scene_number`
+	// is the number the desk shows, which carries decimals on a DiGiCo (1.50
+	// sits between 1 and 2). BridgeLink picks the one the console understands
+	// from scenes.by_number; both ride along so the choice is made there.
+	| { op: 'scene'; scene: number; scene_number?: number }
 	| { op: 'cue_list'; id: number }
 	| { op: 'surface_cc'; cc: number; value: number }
 	| { op: 'action'; cc: number; value: number }

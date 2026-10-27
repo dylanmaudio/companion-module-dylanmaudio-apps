@@ -630,11 +630,12 @@ describe('BridgeLink', () => {
 		fresh.stop()
 	})
 
-	it('refuses a scene recall on a desk that numbers its scenes', async () => {
-		// The SD11 of 27 Oct listed 1.00, 1.01, 1.03, 1.93, 2.83. Our op sends an
-		// integer, which that bridge reads as the PLACE, so a key labelled
-		// "Scene 4" would have recalled 1.93 — the snapshot the desk calls '2'.
-		// Sending the wrong scene during a show is #55 again, so we send nothing.
+	it('recalls by the number on the desk, and never sends a place as well', async () => {
+		// The SD11 of 27 Oct listed 1.00, 1.01, 1.03, 1.93, 2.83. Sent as a
+		// PLACE, a key labelled "Scene 4" recalls 1.93 — the snapshot the desk
+		// calls '2'. MIDI Bridge 1.4.111 takes scene_number (#289), so we send
+		// that and strip `scene`: a place reaching a by_number driver is the
+		// very recall this exists to stop.
 		link.stop()
 		bridge.console = {
 			driver: 'digico',
@@ -655,13 +656,21 @@ describe('BridgeLink', () => {
 		fresh.start()
 		await waitFor(() => fresh.status === 'ok', 'ok')
 
-		expect(fresh.send({ op: 'scene', scene: 4 })).toBe(false)
-		// a mute on the same desk still travels: only the recall is held back
-		expect(fresh.send({ op: 'mute', type: 'input', index: 8, on: true })).toBe(true)
-		await waitFor(() => bridge.cmds.some((c) => (c.body.intent as { op?: string }).op === 'mute'), 'mute')
-		await new Promise((r) => setTimeout(r, 80))
-		expect(bridge.cmds.map((c) => (c.body.intent as { op?: string }).op)).not.toContain('scene')
-		expect(logs.some((l) => l.includes('numbers its scenes'))).toBe(true)
+		// the decimal a DiGiCo allows, which no integer field could carry
+		expect(fresh.send({ op: 'scene', scene: 2, scene_number: 1.5 })).toBe(true)
+		await waitFor(() => bridge.cmds.some((c) => (c.body.intent as { op?: string }).op === 'scene'), 'scene')
+		const sent = bridge.cmds.at(-1)?.body.intent as Record<string, unknown>
+		expect(sent.scene_number).toBe(1.5)
+		expect('scene' in sent).toBe(false) // the place must not ride along
+		expect(logs.some((l) => l.includes('numbers its scenes'))).toBe(false)
+
+		// a button built before the new option: the Scene box is the number
+		bridge.cmds.length = 0
+		expect(fresh.send({ op: 'scene', scene: 4 })).toBe(true)
+		await waitFor(() => bridge.cmds.length > 0, 'fallback')
+		const fallback = bridge.cmds.at(-1)?.body.intent as Record<string, unknown>
+		expect(fallback.scene_number).toBe(4)
+		expect('scene' in fallback).toBe(false)
 		fresh.stop()
 	})
 
@@ -684,8 +693,13 @@ describe('BridgeLink', () => {
 		})
 		fresh.start()
 		await waitFor(() => fresh.status === 'ok', 'ok')
-		expect(fresh.send({ op: 'scene', scene: 4 })).toBe(true)
+		expect(fresh.send({ op: 'scene', scene: 4, scene_number: 4 })).toBe(true)
 		await waitFor(() => bridge.cmds.some((c) => (c.body.intent as { op?: string }).op === 'scene'), 'scene')
+		// a counting desk gets the place and NOTHING else: an older MIDI Bridge
+		// has never seen scene_number, and the dLive is the shipped case.
+		const sent = bridge.cmds.at(-1)?.body.intent as Record<string, unknown>
+		expect(sent.scene).toBe(4)
+		expect('scene_number' in sent).toBe(false)
 		fresh.stop()
 	})
 
