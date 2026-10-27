@@ -103,6 +103,68 @@ settings were up, so the RESTORE −13 button went unpressed.
   memory and flushes later. Reading the database to confirm a UI write will
   tell you it failed when it did not.
 
+## Recall by snapshot number, afternoon session
+
+Built after the sitting's first finding, and checked on the same desk the
+same day. `44fa930` replaces `f83a0c8`'s blanket refusal: MIDI Bridge
+1.4.111 takes `{"op": "scene", "scene_number": 1.5}` (#289), so there is
+something to send.
+
+Three presses at 14:14, the operator's own, against a list settled since
+13:57 (1.00 '1', 1.01 'names', 1.03 'midway', 1.93 '2', 2.83 '3', 3.73 '4',
+4.63 'reset', 6.00 'bo playback'):
+
+| Press | On the wire                                  | Desk                  | Verdict            |
+| ----- | -------------------------------------------- | --------------------- | ------------------ |
+| 1.93  | `/Snapshots/Recall_Snapshot/3` — **place 4** | confirmed in 70–75 ms | right snapshot     |
+| 2.83  | `/Snapshots/Recall_Snapshot/4` — **place 5** | confirmed in 70–75 ms | right snapshot     |
+| 9.99  | **nothing sent**                             | did not move          | refused, see below |
+
+`scene` was absent from both recalls, which is the property that matters:
+a place reaching a `by_number` driver is the recall the work exists to
+stop. The morning's bug is gone — "Scene 4" as a place fetched 1.93, and
+1.93 by number now fetches 1.93.
+
+### Which layer refused 9.99, and which did not
+
+The module **sent** it. The bridge refused it, and said why:
+
+```
+2026-10-27T03:14:25.064Z  warn  Instance/Connection/dylanmaudio
+  Bridge rejected scene: desk_state (no snapshot on the console is numbered 9.99)
+```
+
+(UTC; 14:14:25 local.) Worth stating plainly rather than claiming the
+module was clever: **the module did not protect the desk here, the bridge
+did.** The module refuses a scene number that isn't a number at all
+("two"); 9.99 is a perfectly good number that doesn't exist on that
+console, and only the bridge holds the list. That is the right split, and
+the module's job is to send the number and surface the refusal — which it
+did, via `012fe4f`.
+
+MIDI Bridge's own session log has **no** entry for that refusal. It knew,
+worded it well, and didn't record it. A recall refused mid-show is exactly
+what someone goes to the bridge log to find afterwards; today it is visible
+only in Companion.
+
+### What this evidence is
+
+`two-impl`: the wire log and the desk's confirmations, no console display
+read for these three. That is the complete Companion check under the
+operator's rule of the afternoon — once a parameter has been read on the
+display that day, Companion's check is the wire log matching the measured
+write, and **Show Recorder's SR.6 had already recalled 1.93 and 2.83 by
+number at this desk**, so bridge→desk was settled before these presses. The
+new link was Companion→bridge, and that is a wire log.
+
+### One thing the day exposed that isn't a bug
+
+The first press hit an **expired lane** — reaped idle at 13:41 and again at
+14:11 — which forced a re-hello before the recall went out. Harmless here,
+and the recall landed. On a show it means the first cue key after a quiet
+period is slower than the rest. Whether the module should hold a keep-alive
+is a real design question; it is not answered here.
+
 ## Gaps to carry into 1.2.0
 
 1. **Snapshot recall is by place, and this desk is `by_number`.** Our
@@ -112,12 +174,10 @@ settings were up, so the RESTORE −13 button went unpressed.
    '4'. Only place 1 was sent, where both readings coincide. The module
    should send `scene_number` on a `by_number` desk.
 
-   Since this sitting, `f83a0c8` makes the module **refuse** the recall
-   outright on a `by_number` family, so an SD on that build has no scene
-   recall at all — the safe side, not the fix. The fix is #326 here, #289
-   on the bridge. **Note the build that ran this sitting (`dist/` at 10:51)
-   predates the refusal**, so recall-by-place was still live on the desk all
-   afternoon.
+   **Closed the same day.** `f83a0c8` first made the module refuse the
+   recall outright — the safe side, not the fix — and `44fa930` replaced
+   that with recall by the desk's own number, checked on this desk at 14:14
+   (see above). #326 here, #289 on the bridge.
 
 2. **Macros cannot be fired.** The block declares a `macro` field; we
    hard-code cc/value. This is the block-driven Action work — #327 here,
