@@ -19,7 +19,7 @@ import { DEFAULT_CONFIG } from './config.js'
 import { ConsoleLink } from './link.js'
 import type { LinkApi } from './link-api.js'
 import { TcpTransport } from './transport/transport.js'
-import { stripCountsFor } from './variables.js'
+import { scopedStrips, stripCountsFor } from './variables.js'
 
 const SIM_ROOT = process.env.DLIVE_SIM_ROOT ?? join(homedir(), 'Documents', 'GitHub', 'dLive Utility Apps')
 const HAVE_SIM = existsSync(join(SIM_ROOT, 'sim', 'virtual_console.py'))
@@ -257,32 +257,41 @@ describe.skipIf(!HAVE_SIM)('end-to-end against the Virtual dLive', () => {
 		await idle(inst)
 		expect(host.variables['name_ch1']).toBe('Ip 1')
 		expect(host.variables['connected']).toBe(true)
-		// 46 strips in scope × (name, colour, mute) + 38 faders = 176 Gets, all answered.
+		// This used to assert 176 Gets sent and 176 answered: 46 strips in
+		// scope × (name, colour, mute) + 38 faders. It was the file's one
+		// unreliable assertion for weeks, and the figure was never the
+		// module's to keep. The sim is Python on the same Mac as the test and
+		// the module's reply timer is 500 ms — a desk on a LAN. A late reply is
+		// counted a MISS, three misses of an op purge the REST of that op from
+		// the queue, and the sync lands tens of Gets short: 54, 110 and 172
+		// have all been seen. Raising the timer only moves the problem,
+		// measured on 28 Oct: at 2500 ms the sync is slower to recover and the
+		// 5 s wait above times out instead.
 		//
-		// If this fails with a count BELOW 176, check the machine before the
-		// code. The sim is Python against the module's fixed retry timers, so a
-		// loaded Mac starves it and the module reports "No reply to get_name
-		// after 3 attempts". On 22 Oct 2026, at a load average of 62, the same
-		// run gave 54, then 172, then 172.
-		//
-		// A count that varies between runs is the machine. A count that repeats
-		// is NOT by itself a real break: on 27 Oct 2026, at a load average of 5,
-		// three consecutive runs all read 172 and that looked conclusive — but
-		// the same test at a commit predating the change under suspicion read
-		// 110, 172, 54, 110. A steady load holds the count steady. Three
+		// A repeating count is no evidence of a real break either. On 27 Oct
+		// three consecutive runs all read 172 and that looked conclusive; the
+		// same test at a commit predating the change under suspicion read 110,
+		// 172, 54, 110. A steady load holds the count steady, and three
 		// readings are not a sample.
 		//
-		// So: run `uptime`, don't go looking in the sim until the one-minute
-		// load is in single figures, and before blaming a commit, run this test
-		// at a commit that predates it (`git worktree add --detach`, symlink
-		// node_modules in). If the old commit fails too, the machine is the
-		// story.
-		expect(inst.link.scheduler.stats.sent).toBe(176)
-		expect(inst.link.scheduler.stats.replied).toBe(176)
+		// So the two halves are asserted apart. The SCOPE — which is what the
+		// figure was really guarding, and what a loose range would have let
+		// through — comes from the pure function, where nothing can starve it.
+		// The WIRE gets only what stays true however slow the sim is.
+		const scope = scopedStrips({ inputs: 8, extendedTypes: false })
+		expect(scope.length).toBe(46)
+		expect(scope.filter((r) => r.type !== 'mute_group').length).toBe(38) // the faders
+		const sync = inst.link.scheduler.stats
+		expect(sync.sent).toBeGreaterThan(0)
+		// At idle nothing is in flight, so every Get asked for has either been
+		// answered or timed out. A large `missed` here is the sim's pace or the
+		// machine's; the module already reports it as the `gets_missed`
+		// variable, which is the honest place for it, and not a red test on
+		// somebody's laptop.
+		expect(sync.replied + sync.missed).toBe(sync.sent)
 		expect(host.variableDefs.has('mute_dca24')).toBe(true)
 		expect(host.variableDefs.has('name_aux1')).toBe(false) // extendedTypes off
 		expect(host.presets.presets).toBeGreaterThan(10)
-		expect(inst.link.scheduler.stats.missed).toBe(0)
 	})
 
 	it('mute action → desk model → echo → feedback + variable', async () => {
