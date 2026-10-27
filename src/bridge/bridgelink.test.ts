@@ -760,6 +760,27 @@ describe('BridgeLink', () => {
 		expect(deltaToEvent('input.1.stereo', 'yes')).toBeUndefined()
 	})
 
+	it('reads the current scene from the object the desk sends (#342)', () => {
+		// Straight off the fixture, so the shape and the decoder can't drift
+		// apart: the Wing's scene.current is {number, name}, an object.
+		const body = fixture('state.scene.current.wing').response.body as {
+			state: Record<string, unknown>
+		}
+		const value = body.state['scene.current']
+		expect(value).toEqual({ number: 4, name: 'UP1' })
+		expect(deltaToEvent('scene.current', value)).toEqual({ kind: 'scene', scene: 4 })
+		// a bare number is tolerated too; nothing says a family sends one
+		expect(deltaToEvent('scene.current', 12)).toEqual({ kind: 'scene', scene: 12 })
+		// an SD's snapshot number is decimal, and dropping it would be the
+		// same silent loss this bug was
+		expect(deltaToEvent('scene.current', { number: 1.5 })).toEqual({ kind: 'scene', scene: 1.5 })
+		// junk is still refused rather than reported as scene NaN
+		expect(deltaToEvent('scene.current', { name: 'UP1' })).toBeUndefined()
+		expect(deltaToEvent('scene.current', {})).toBeUndefined()
+		expect(deltaToEvent('scene.current', null)).toBeUndefined()
+		expect(deltaToEvent('scene.current', 0)).toBeUndefined()
+	})
+
 	it('deltaToEvent rejects junk honestly', () => {
 		expect(deltaToEvent('input.5.fader', { lv: 95, db: -6.1 })).toEqual({
 			kind: 'fader',

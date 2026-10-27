@@ -896,8 +896,22 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 export function deltaToEvent(path: string, value: unknown): ConsoleEvent | undefined {
 	const parts = path.split('.')
 	if (path === 'scene.current') {
-		const n = Number(value)
-		return Number.isInteger(n) && n >= 1 ? { kind: 'scene', scene: n } : undefined
+		// The value is an object: `{number, name}` (spec §8, and
+		// fixtures/api/exchanges.json state.scene.current.wing — "an object,
+		// never a number"). `Number({…})` is NaN, so reading it as a number
+		// dropped it in silence. The cold snapshot's scene never landed and
+		// scene_current read blank until the first recall of the show, which
+		// arrives as a `scene` event instead and goes through another path
+		// (#342; seen on a Wing, 27 Oct, sitting on scene 2 with the variable
+		// empty). A bare number is still accepted — no spec or fixture says a
+		// family sends one, but it costs nothing and an older bridge is not
+		// worth guessing about.
+		const raw = typeof value === 'object' && value !== null ? (value as { number?: unknown }).number : value
+		const n = Number(raw)
+		// Finite, not integer: an SD11's snapshots are numbered 1.50 and such
+		// (27 Oct), and no fixture yet says what it puts here. An integer test
+		// would drop those the same silent way this bug did.
+		return Number.isFinite(n) && n >= 1 ? { kind: 'scene', scene: n } : undefined
 	}
 	if (path === 'connection.console') return undefined // handled as status
 	if (parts.length !== 3) return undefined

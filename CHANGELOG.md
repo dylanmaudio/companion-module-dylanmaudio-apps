@@ -28,6 +28,15 @@
 - Levels stay held back when `capabilities.fader_db` is false: that means
   the bridge hasn't verified that family's law on a desk, so a dB would
   not land where it says.
+- **The current scene no longer reads blank until the first recall**
+  (#342). The mirror reports it as `{number, name}`, an object, and the
+  module read that as a number: `Number({…})` is NaN, so the value was
+  dropped without a word. A connection made mid-show — which is every
+  connection, after a Companion restart — left `scene_current` and
+  `scene_current_name` empty while the desk sat on a scene, and they only
+  filled in when someone recalled the next one. Seen on a Behringer Wing,
+  27 Oct, parked on scene 2 with both variables blank. A decimal scene
+  number (an SD's 1.50) is kept rather than discarded as well.
 
 ## 1.1.1 — 2026-10
 
