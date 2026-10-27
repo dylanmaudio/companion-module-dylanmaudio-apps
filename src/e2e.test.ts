@@ -263,10 +263,20 @@ describe.skipIf(!HAVE_SIM)('end-to-end against the Virtual dLive', () => {
 		// code. The sim is Python against the module's fixed retry timers, so a
 		// loaded Mac starves it and the module reports "No reply to get_name
 		// after 3 attempts". On 22 Oct 2026, at a load average of 62, the same
-		// run gave 54, then 172, then 172. **A count that varies between runs is
-		// the machine; a count that is the same every time is a real break.**
-		// Run `uptime` first, and don't go looking in the sim until the
-		// one-minute load is in single figures.
+		// run gave 54, then 172, then 172.
+		//
+		// A count that varies between runs is the machine. A count that repeats
+		// is NOT by itself a real break: on 27 Oct 2026, at a load average of 5,
+		// three consecutive runs all read 172 and that looked conclusive — but
+		// the same test at a commit predating the change under suspicion read
+		// 110, 172, 54, 110. A steady load holds the count steady. Three
+		// readings are not a sample.
+		//
+		// So: run `uptime`, don't go looking in the sim until the one-minute
+		// load is in single figures, and before blaming a commit, run this test
+		// at a commit that predates it (`git worktree add --detach`, symlink
+		// node_modules in). If the old commit fails too, the machine is the
+		// story.
 		expect(inst.link.scheduler.stats.sent).toBe(176)
 		expect(inst.link.scheduler.stats.replied).toBe(176)
 		expect(host.variableDefs.has('mute_dca24')).toBe(true)
