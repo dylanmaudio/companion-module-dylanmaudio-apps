@@ -1,53 +1,67 @@
-# The SD's stereo shape — read from a live bridge, 27 Oct 2026
+# The stereo shape, and the module's bug — 27 Oct 2026
 
-Captured while the SD11 was on the bench, for the module's stereo decoder
-work (#3 on the Companion checklist). **Not a fixture**: fixtures under
-`fixtures/api/` are authored in the monorepo and vendored here. This is a
-note of what one running build mirrored, with the build named, so the
-decoder work has something better than a description to go on.
+Written while the SD11 was on the bench, **corrected the same day**. The
+first version of this note said `{"width": ...}` was "one build's
+behaviour". That was wrong, and the correction matters more than the
+observation did.
 
-## What was observed
+## The source is the spec, not a mirror
 
-MIDI Bridge from source, `topic/digico-fader-db` at **1a5e8c55**, pid 66371,
-connected to the SD11 at 192.168.31.222. Read from `/api/v1/state` at about
-13:50:
+`{width}` is the Client API's documented shape, in
+`docs/bridge-client-api-v1.md` §1b **on main** (DEV: ROADMAP, with the
+line references). The contract reads:
 
-```
-input.1.stereo = {"width": "mono"}
-input.2.stereo = {"width": "mono"}
-input.3.stereo = {"width": "stereo"}
-input.4.stereo = {"width": "stereo"}
-```
+> **`stereo: null` means the family can't say,** never mono. The dLive
+> can't report an input's link, so its inputs are `null`. The SQ reports
+> `{"linked": false}` or `{"linked": true, "half", "partner"}` for every
+> input, and `{"width": "mono" | "stereo"}` for every mix.
 
-40 `*.stereo` keys in all. The mirror also carried `input_type` on that
-build. The console block's `capabilities` did **not** advertise stereo:
-`[action_fire, fader, mute, name_get, scene_recall, surface_lights]`.
+So `{width}` is not a DiGiCo quirk. It is **every mix on every family**,
+the SQ included — a desk this module already drives.
 
-## What the next build mirrored
+## How I got it wrong
 
-MIDI Bridge `mc-318` at **043319ab**, pid 89373, same desk, read at about
-14:20: **233 keys and not one `*.stereo` among them**, and no `input_type`
-either. Same console capabilities list.
+I read a running bridge's mirror, saw 40 `*.stereo` keys of
+`{"width": ...}` on `topic/digico-fader-db` 1a5e8c55, went back for a
+cleaner reading, found `mc-318 043319ab` mirroring **no** stereo keys at
+all (233 keys, not one `*.stereo`), and concluded the shape was
+build-specific. It isn't: 043319ab was cut before `topic/digico-names`.
+**A branch that predates a change is not a bridge that sends something
+else**, and I had the spec available the whole time.
 
-## Why that matters
+Grading a single mirror reading `single` was right for what it was. The
+mistake was treating "what I saw running" as the only available source
+when a written contract existed. `protocol.md`'s rule is about not citing
+summaries as sources; this is its mirror image — not noticing that a real
+source was there to be read.
 
-The module's decoder (`bridgelink.ts`, `case 'stereo'`) reads the SQ's
-`{linked, half, partner}`. Against `{width: ...}` it does not reject the
-payload — it returns `linked: false`, so **every channel reads as unlinked,
-confidently and wrongly**. That is the same silent-drop class as the fader
-bug of the same morning, one layer up: a plausible wrong answer rather than
-nothing.
+## The bug, which is not about `{width}` at all
 
-But the fix must not be written as though `{width}` is simply "the SD's
-shape". On the evidence here it is **one build's shape**, and the build the
-desk finished the day on sent no stereo at all. So:
+`bridgelink.ts`, `case 'stereo'`, returns `linked: o.linked === true`. For
+any shape it does not recognise, that is `linked: false` — **a confident
+"not linked" where the spec says "can't say"**. The silent-drop class
+again, one layer up from `ef1aed5`'s fader bug: a plausible wrong answer
+rather than nothing.
 
-- Handle `{width}` **and** `{linked, half, partner}`, and treat an
-  unrecognised shape as unknown rather than as "not linked".
-- Don't infer a partner from `{width}` alone. `{"width": "stereo"}` says
-  this channel is half of a pair; it does not say which half, or which
-  channel the other half is. The SQ's shape says all three.
-- Confirm against a bridge build that actually mirrors it before claiming
-  a desk verified it. Nothing here was read on the console's display.
+It reaches the shipped product. `variables.ts:153` reads
+`s.stereo?.linked ?? false`, so on a **dLive** — whose inputs are `null`
+by the spec, because the desk cannot report a link — every
+`$(dylanmaudio:linked_chN)` reads `false`. 1.1.x is dLive-only, so this is
+what every user of the shipped module has today: a variable stating as
+fact something the console never said.
 
-Graded `single`: one implementation, one reading, no hardware confirmation.
+## What the fix has to do
+
+- `{linked, half, partner}` read as now.
+- `{width: "mono" | "stereo"}` read for what it says. It means this strip
+  is stereo; it does **not** name a half or a partner, and nothing should
+  be inferred about either.
+- **Anything else — unrecognised, `null`, or absent — is unknown, never
+  `linked: false`.** This is the actual defect, whatever shapes exist.
+- Decide deliberately what `linked_*` reads when the answer is unknown.
+  `false` is a lie; `''` matches how `partner` already reports nothing.
+  It is a change to shipped behaviour on every dLive, which is why it is
+  not made here on my own authority.
+
+Confirm on a desk with a bridge from `topic/digico-names`, or on the Wing
+with 1.4.111. Nothing here was read on a console's display.
