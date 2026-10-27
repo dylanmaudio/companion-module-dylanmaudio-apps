@@ -35,7 +35,14 @@ export interface StripState {
 	 * pair moves together on the desk, so treating the halves as independent
 	 * strips is how a module shows a fader move on one and not the other.
 	 */
-	stereo: { linked: boolean; half: 'A' | 'B' | undefined; partner: number | undefined } | undefined
+	stereo:
+		| {
+				linked: boolean | undefined
+				half: 'A' | 'B' | undefined
+				partner: number | undefined
+				width: 'mono' | 'stereo' | undefined
+		  }
+		| undefined
 	/**
 	 * dB as the desk itself reports it, where it does (`{wire, db, steps}`).
 	 * On a dLive this stays undefined and dB is derived from `level` through
@@ -171,8 +178,15 @@ export class ConsoleState {
 			case 'stereo': {
 				const s = this.strip(ev)
 				const was = s.stereo
-				if (was && was.linked === ev.linked && was.half === ev.half && was.partner === ev.partner) return []
-				s.stereo = { linked: ev.linked, half: ev.half, partner: ev.partner }
+				if (
+					was &&
+					was.linked === ev.linked &&
+					was.half === ev.half &&
+					was.partner === ev.partner &&
+					was.width === ev.width
+				)
+					return []
+				s.stereo = { linked: ev.linked, half: ev.half, partner: ev.partner, width: ev.width }
 				return [stereoPath(ev)]
 			}
 			case 'fader': {

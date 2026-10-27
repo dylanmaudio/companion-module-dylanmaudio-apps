@@ -940,19 +940,40 @@ export function deltaToEvent(path: string, value: unknown): ConsoleEvent | undef
 			return { kind: 'fader', ...ref, level: lv }
 		}
 		case 'stereo': {
-			// {linked, half, partner} — the desk's own pairing. A linked pair
-			// moves together, so a module that ignores this shows a fader move
-			// on one half and nothing on the other.
+			// Two shapes, per the Client API spec §1b, and a third case that
+			// matters more than either:
+			//
+			//   {linked, half, partner}  the SQ's input pairing. A linked pair
+			//                            moves together, so a module that
+			//                            ignores it shows a fader move on one
+			//                            half and nothing on the other.
+			//   {width: mono|stereo}     the Wing's and the SD's inputs, and
+			//                            every family's MIXES, the SQ included.
+			//                            Says this strip is stereo; says NOTHING
+			//                            about a half or a partner.
+			//   null / anything else     the family CANNOT SAY. The dLive is
+			//                            here: it cannot report an input's link.
+			//
+			// The spec's words are "`stereo: null` means the family can't say,
+			// never mono". We used to answer `linked: o.linked === true` for
+			// every shape, which turned "can't say" and "this mix is stereo"
+			// alike into a confident "not linked" — wrong on the Wing, wrong on
+			// the SD, and wrong on every shipped dLive.
 			if (typeof value !== 'object' || value === null) return undefined
-			const o = value as { linked?: unknown; half?: unknown; partner?: unknown }
+			const o = value as { linked?: unknown; half?: unknown; partner?: unknown; width?: unknown }
 			const half = o.half === 'A' || o.half === 'B' ? o.half : undefined
 			const partner = Number(o.partner)
+			const width = o.width === 'mono' || o.width === 'stereo' ? o.width : undefined
+			// Only a real boolean is an answer. An absent key is not `false`.
+			const linked = typeof o.linked === 'boolean' ? o.linked : undefined
+			if (linked === undefined && width === undefined) return undefined
 			return {
 				kind: 'stereo',
 				...ref,
-				linked: o.linked === true,
+				linked,
 				half,
 				partner: Number.isInteger(partner) && partner > 0 ? partner : undefined,
+				width,
 			}
 		}
 		case 'name':

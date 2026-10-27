@@ -726,6 +726,37 @@ describe('BridgeLink', () => {
 			half: undefined,
 			partner: undefined,
 		})
+	})
+
+	it('reads {width} as width, and never as "not linked"', () => {
+		// The Wing, 27 Oct: 26 *.stereo keys, every one {"width": ...}, for
+		// inputs and aux_in. The SD mirrored the same shape. Per the Client
+		// API spec §1b it is also every family's MIXES, the SQ included.
+		expect(deltaToEvent('input.1.stereo', { width: 'stereo' })).toEqual({
+			kind: 'stereo',
+			type: 'input',
+			index: 1,
+			linked: undefined, // NOT false: this says nothing about pairing
+			half: undefined,
+			partner: undefined,
+			width: 'stereo',
+		})
+		expect(deltaToEvent('input.3.stereo', { width: 'mono' })).toMatchObject({
+			linked: undefined,
+			width: 'mono',
+		})
+	})
+
+	it("says nothing where the family can't say, rather than 'not linked'", () => {
+		// The spec: "`stereo: null` means the family can't say, never mono."
+		// A dLive cannot report an input's link at all, and the dLive is the
+		// whole of the shipped product — so this is the case that was wrong
+		// in every customer's hands, not an exotic one.
+		expect(deltaToEvent('input.1.stereo', null)).toBeUndefined()
+		expect(deltaToEvent('input.1.stereo', {})).toBeUndefined()
+		expect(deltaToEvent('input.1.stereo', { width: 'quadraphonic' })).toBeUndefined()
+		// and an absent `linked` key is not a false one
+		expect(deltaToEvent('input.1.stereo', { half: 'A', partner: 2 })).toBeUndefined()
 		expect(deltaToEvent('input.1.stereo', 'yes')).toBeUndefined()
 	})
 

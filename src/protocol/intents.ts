@@ -110,12 +110,25 @@ export type ConsoleEvent =
 			kind: 'stereo'
 			type: ChannelType
 			index: number
-			/** the desk links this strip to a partner */
-			linked: boolean
+			/**
+			 * The desk links this strip to a partner. `undefined` means the
+			 * family CANNOT SAY — the Client API spec §1b is explicit that
+			 * `stereo: null` means that, never mono — so it must never be
+			 * flattened to false. A dLive cannot report an input's link at
+			 * all, and that is most of the shipped product.
+			 */
+			linked: boolean | undefined
 			/** which half of the pair it is, where the desk says */
 			half: 'A' | 'B' | undefined
 			/** the partner's index on the same type, where the desk says */
 			partner: number | undefined
+			/**
+			 * The strip is itself stereo, as the Wing and the SD report every
+			 * input and the SQ reports every mix: `{"width": "mono"|"stereo"}`.
+			 * It says nothing about a half or a partner, and nothing may be
+			 * inferred about either from it.
+			 */
+			width: 'mono' | 'stereo' | undefined
 	  }
 	| {
 			kind: 'fader'
