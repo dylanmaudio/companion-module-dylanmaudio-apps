@@ -138,7 +138,23 @@ What does not work:
    would make a pinned scene button safe on a desk that renumbers, and it
    would read the same way to anyone who already knows the macro one.
    Suggested to the driver and API threads; not this module's to decide,
-   and nothing is built for it.
+   and nothing is built for it. **Proposed, 28 Oct** (DEV: Yamaha driver
+   to DEV: Multi-console apps, not yet agreed): an optional `scene_name`
+   on a by-number recall, `macro_name`'s rule — 400 `desk_state` on a
+   mismatch, 503 while the name isn't read — checked by the codec against
+   the scene list, or against `ssinfot_ex` answers on a Yamaha with no
+   list. If it is agreed, this module wants a new **additive** option on
+   `scene_recall` beside `scene_number`, which is another 1–2 h on §9's
+   table.
+
+   One thing to settle with them before it is built, because it is this
+   module's behaviour and not theirs: a 503 is **not** retried here. The
+   code deliberately drops a refused scene recall and logs it, because a
+   scene arriving late is its own hazard (`postCmd`, and the same decision
+   for the SD's #318). So a guarded recall pressed while the name isn't
+   read is a lost press, not a delayed one — fine, but the operator must
+   be told in the log, and the guard's value is in the 400 case rather
+   than the 503 one.
 
    The driver's canonical form, for what it is worth to the decision
    below, is **two decimals**: `"2.50"`, and on a DM7 the scene key is
