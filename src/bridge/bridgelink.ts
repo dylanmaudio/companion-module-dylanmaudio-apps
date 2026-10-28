@@ -75,17 +75,24 @@ const SCALED_OPS = new Set(['fader', 'fade', 'send_level', 'get_fader', 'get_sen
  * the bridge's own `verified_on_desk` for that family, and still refuses a
  * dLive-scaled value or a dLive byte on any of them.
  *
- * `avantis` and `yamaha` are here for the four-desk day on 4 Nov 2026. Both
- * ids are read from the monorepo's own family registries rather than taken
- * from a message: `sim/session/families.py` on topic/cxc-avantis-yamaha has
- * Family("avantis", "Allen & Heath Avantis"), and the same file on
- * topic/yamaha-driver has Family("yamaha", "Yamaha Rivage PM / DM7 (RCP)") —
- * one id for both Yamaha desks, with the model coming from the desk itself.
- * Neither is on the monorepo's main yet, and `shared/target/yamaha/` has no
- * driver.py at all so far, so the name the bridge will actually report in
- * `console.driver` is the convention every other family follows here and not
- * yet a thing anyone has seen on a wire. If a desk reports something else on
- * the day, this line is the only place that needs it.
+ * `avantis` and `yamaha` are here for the four-desk day on 4 Nov 2026, and
+ * both ids are read from the monorepo rather than taken from a message.
+ *
+ * `yamaha` is the driver's own: `YamahaTargetDriver.name` returns it and
+ * `client_profile` puts `"driver": self.name` in the console block, so it is
+ * the string this module will actually compare (topic/yamaha-driver,
+ * shared/target/yamaha/driver.py at d2471478 — a draft, and not registered
+ * yet). One id covers the Rivage and the DM7; the model comes from the desk's
+ * own devinfo, not from the family.
+ *
+ * `avantis` is the family registry's: Family("avantis", "Allen & Heath
+ * Avantis") in sim/session/families.py on topic/cxc-avantis-yamaha. That is
+ * the convention every other family here follows, but it is not the driver
+ * declaring its own name the way the Yamaha's does, so it is the weaker of
+ * the two.
+ *
+ * Neither branch is on the monorepo's main. If a desk reports something else
+ * on the day, this line is the only place that needs it.
  */
 const CONSOLES = ['dlive', 'sq', 'wing', 'digico', 'avantis', 'yamaha']
 

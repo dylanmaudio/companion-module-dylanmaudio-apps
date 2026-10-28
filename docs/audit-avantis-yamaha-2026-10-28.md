@@ -52,14 +52,23 @@ deciding before the day, not on it.
 client didn't name, every scene, mute, fader, fade, send, name and Action
 is refused 400 `wrong_console`, while reads and the stream stay open.
 
-So each family needs its id added, and **the id is the driver's, not a
-guess.** `'avantis'` is the obvious spelling and `digico`/`sq`/`wing` set
-the precedent, but neither new driver's id appears in SPEC or in any
-fixture here yet, and the Yamaha one has a real question behind it: one
-driver covers Rivage, DM7 and CL/QL (RESEARCH-YA §1, "one scheme for all
-four"), so the id may be a family name rather than a model. Asked of
-DEV: Multi-console apps and DEV: Yamaha driver; nothing is added until
-they answer.
+**Settled on 28 Oct, after this section was first written.** Both ids are
+now in `CONSOLES`, read from the monorepo and not from a thread's message:
+
+- **`yamaha`** is the driver's own. `YamahaTargetDriver.name` returns it
+  and `client_profile` puts `"driver": self.name` into the console block,
+  so it is the string this module will actually compare
+  (topic/yamaha-driver, `shared/target/yamaha/driver.py` at d2471478 — a
+  draft, and unregistered). One id covers the Rivage and the DM7; the
+  model comes from the desk's own `devinfo productname`, not the family.
+- **`avantis`** is the family registry's: `Family("avantis", "Allen &
+Heath Avantis")` in `sim/session/families.py` on
+  topic/cxc-avantis-yamaha. That is the convention every other family
+  follows, but it is not the driver declaring its own name the way the
+  Yamaha's does, so it is the weaker of the two.
+
+Neither branch is on the monorepo's main. One line changes if a desk says
+otherwise on the day.
 
 Adding ids is additive and breaks nobody (CLAUDE.md).
 
@@ -113,6 +122,14 @@ What does not work:
    `12.50,Chorus` is rejected outright with "expected &lt;scene&gt;,&lt;name&gt;"
    and `999,Finale` with "scene must be 1–500". Every scene-name variable
    and every scene preset on those desks is therefore empty.
+
+   The driver's canonical form, for what it is worth to the decision
+   below, is **two decimals**: `"2.50"`, and on a DM7 the scene key is
+   `"A 2.50"` / `"B 1.00"` with the list first (DEV: Yamaha driver, 28
+   Oct, `shared/target/yamaha/protocol.py` `scene_text`). The driver does
+   not constrain how that becomes a Companion variable id, and says so.
+   What the desk's own screen shows is read on 2 Nov.
+
 2. **A decimal key has nowhere to live.** `scene_name_${n}` would spell
    12.50 as `scene_name_12.5` — a dot inside a Companion variable id, and
    a lossy spelling of a number the desk writes with two places. A new
