@@ -138,14 +138,42 @@ What does not work:
    would make a pinned scene button safe on a desk that renumbers, and it
    would read the same way to anyone who already knows the macro one.
    Suggested to the driver and API threads; not this module's to decide,
-   and nothing is built for it. **Proposed, 28 Oct** (DEV: Yamaha driver
-   to DEV: Multi-console apps, not yet agreed): an optional `scene_name`
-   on a by-number recall, `macro_name`'s rule — 400 `desk_state` on a
-   mismatch, 503 while the name isn't read — checked by the codec against
-   the scene list, or against `ssinfot_ex` answers on a Yamaha with no
-   list. If it is agreed, this module wants a new **additive** option on
-   `scene_recall` beside `scene_number`, which is another 1–2 h on §9's
-   table.
+   and nothing is built for it. **Accepted 28 Oct** as `scene_name`, an
+   optional field on a by-number recall: an exact, non-empty string match
+   against the scene at that number and list, with no trimming and no
+   case folding, and — unlike `macro_name` — no uniqueness requirement,
+   because shows repeat scene names and uniqueness would refuse every
+   pinned recall in one. A mismatch is 400 `desk_state` carrying the
+   scene's actual name; a name not read yet is 503 `scene_unavailable`;
+   with `scene` (a place) instead of `scene_number` it is 400
+   `bad_intent`. The Client API checks it from the state's scene list
+   where the desk has places, so the SD gets it with no codec change.
+   Due in the doc and `exchanges.json` by 2–3 Nov, and nothing is built
+   here until it is in the fixture.
+
+   **Two things that are this module's to get right, not theirs.**
+
+   First, and it is the one that could hurt: the pin may only be sent
+   where the console block says `scenes.name_pin: true`. A bridge older
+   than the field ignores unknown intent fields, so a pin sent to one
+   **recalls unchecked and says nothing** — the exact silent wrong recall
+   the pin exists to prevent, now wearing the operator's belief that they
+   are protected. So the module must read the flag and, where it is
+   false, **refuse the press locally and say why** rather than recall
+   without the guard. Recommending refusal: a button that says it is
+   pinned either is or stops. That is a product decision and the
+   operator's to confirm.
+
+   Second, "no trimming, no case folding" meets a free-text box and an
+   expression. A trailing space in the typed name, or in the name the
+   desk reports, fails the pin for a reason nobody can see. The 400
+   carries the actual name, which is the right design, so the module's
+   job is to put it in the log plainly and to say in the tooltip and
+   HELP that the match is exact, spaces included.
+
+   This module wants a new **additive** option on `scene_recall` beside
+   `scene_number`, which is another 1–2 h on §9's table, plus the flag
+   reader and the refusal path.
 
    One thing to settle with them before it is built, because it is this
    module's behaviour and not theirs: a 503 is **not** retried here. The
