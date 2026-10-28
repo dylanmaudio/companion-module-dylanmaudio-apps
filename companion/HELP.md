@@ -258,6 +258,29 @@ without re-exporting anything.
 - Anything the module sets itself is mirrored immediately, so buttons
   update even if the desk does not echo.
 
+### On a console that is not a dLive
+
+MIDI Bridge can drive other desks, and this module follows it onto one
+only once the bridge says that family's driver has been run against a
+real desk. Until then the connection sits red and says which desk it
+found: nothing is sent, because a dLive fader value means a different
+level elsewhere. Reading carries on regardless, so variables and
+feedbacks still follow the desk.
+
+**Expect feedback to start blank on some desks, and fill in as the show
+moves.** A dLive can be asked for the current state of anything, so
+buttons are right the moment you connect. Not every console can: an
+Allen & Heath Avantis, for one, answers only for names and colours —
+there is no way for anybody to ask it a mute or a fader. On a desk like
+that, mute and level feedback is blank until that channel is touched for
+the first time, and then stays correct for the rest of the show. It is
+not a broken connection, and reconnecting will not fill it in; moving
+the fader will. `$(dlive:connected)` being true is the thing to check.
+
+Scene recall, mutes and names work on a verified desk. Levels are held
+back until the bridge has measured that console's fader law, and the log
+says so in a sentence rather than failing quietly.
+
 ## Actions
 
 Mute · Fader (dB, ±dB, raw, all with optional timed fade) · Send level ·
@@ -319,13 +342,13 @@ sends arrives.
 
 What costs a slot:
 
-| What you run | MixRack connections |
-|---|---|
-| **This module, through MIDI Bridge** | **one, shared.** Console Control, a DAW and every dylanmaudio app ride the same bridge connection |
-| A direct dLive Companion module aimed at the MixRack | one each |
-| `allenheath-dlive-ilive` | one, plus A&H's network port 51321 |
-| A direct module aimed at the **Surface** (51328) | probably none — unmeasured |
-| A&H Director | unmeasured |
+| What you run                                         | MixRack connections                                                                               |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **This module, through MIDI Bridge**                 | **one, shared.** Console Control, a DAW and every dylanmaudio app ride the same bridge connection |
+| A direct dLive Companion module aimed at the MixRack | one each                                                                                          |
+| `allenheath-dlive-ilive`                             | one, plus A&H's network port 51321                                                                |
+| A direct module aimed at the **Surface** (51328)     | probably none — unmeasured                                                                        |
+| A&H Director                                         | unmeasured                                                                                        |
 
 That shared connection is the point of the bridge: you can add apps
 without spending slots, and one MIDI monitor attributes every message to
@@ -351,8 +374,10 @@ slot opening. A module that connects once and waits will stay silent.
 connection, so a direct SQ Companion module takes the only slot and locks
 out MIDI Bridge, Console Control and every dylanmaudio app for as long as
 it holds it. If you use the bridge on an SQ, disable Companion's own
-Allen & Heath SQ connection for that desk. (This module drives a dLive
-only — see "What this module is".)
+Allen & Heath SQ connection for that desk. (On any desk that is not a
+dLive, see "On a console that is not a dLive" above: the module follows
+MIDI Bridge onto it only once that family's driver has been verified on
+a real desk.)
 
 ## Limitations (protocol, not the module)
 

@@ -74,8 +74,20 @@ const SCALED_OPS = new Set(['fader', 'fade', 'send_level', 'get_fader', 'get_sen
  * Naming one here is not a claim that it works: the per-op gate still needs
  * the bridge's own `verified_on_desk` for that family, and still refuses a
  * dLive-scaled value or a dLive byte on any of them.
+ *
+ * `avantis` and `yamaha` are here for the four-desk day on 4 Nov 2026. Both
+ * ids are read from the monorepo's own family registries rather than taken
+ * from a message: `sim/session/families.py` on topic/cxc-avantis-yamaha has
+ * Family("avantis", "Allen & Heath Avantis"), and the same file on
+ * topic/yamaha-driver has Family("yamaha", "Yamaha Rivage PM / DM7 (RCP)") —
+ * one id for both Yamaha desks, with the model coming from the desk itself.
+ * Neither is on the monorepo's main yet, and `shared/target/yamaha/` has no
+ * driver.py at all so far, so the name the bridge will actually report in
+ * `console.driver` is the convention every other family follows here and not
+ * yet a thing anyone has seen on a wire. If a desk reports something else on
+ * the day, this line is the only place that needs it.
  */
-const CONSOLES = ['dlive', 'sq', 'wing', 'digico']
+const CONSOLES = ['dlive', 'sq', 'wing', 'digico', 'avantis', 'yamaha']
 
 /** Gets in flight during a cold sync: enough to be quick, not a spray (client API §11). */
 const COLD_SYNC_LANES = 4
@@ -615,10 +627,26 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	 */
 	private async coldSync(scope: SyncScope, why: string, session: number): Promise<void> {
 		if (scope === 'none') return
-		// A desk we won't drive isn't worth asking about: the bridge answers a
-		// dLive-shaped Get with bad_intent, once per strip, and the values
-		// wouldn't fit our scale anyway.
-		if (this.refuseForeign('query')) return
+		// Only a dLive is asked. On every other family the mirror is the
+		// better source and the only one: `query` carries dLive-shaped Gets,
+		// which earn one bad_intent per strip there, and the snapshot at
+		// GET /state already holds whatever the bridge knows.
+		//
+		// This used to go through refuseForeign('query'), which gave the same
+		// answer for the right reason on an unverified desk and the wrong
+		// sentence on a verified one — the operator read "query isn't sent on
+		// a Wing: it is encoded as dLive bytes" on a desk the module was
+		// driving perfectly well. The refusal an operator does need to see,
+		// for an unverified family, is the one applyConsoleState puts on the
+		// connection, and refuseForeign still says it on the first real send.
+		if (this.foreignFamily) {
+			this.emit(
+				'log',
+				'debug',
+				`No cold sync on a ${this.foreignFamily}: its values come from the bridge's mirror, not from Gets.`,
+			)
+			return
+		}
 		const wide = scope !== 'names'
 		const jobs = (this.opts.strips ?? []).map(({ type, index }) => {
 			const fields = ['name', 'colour']

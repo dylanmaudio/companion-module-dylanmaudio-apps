@@ -914,7 +914,46 @@ describe('BridgeLink', () => {
 			})
 			fresh.start()
 			await waitFor(() => bridge.hellos.length > 0, 'hello')
-			expect(bridge.hellos[0].consoles).toEqual(['dlive', 'sq', 'wing', 'digico'])
+			// avantis and yamaha from 28 Oct, for the four-desk day on 4 Nov. The
+			// ids are the monorepo's own: Family("avantis", …) and
+			// Family("yamaha", "Yamaha Rivage PM / DM7 (RCP)") in
+			// sim/session/families.py, one id for both Yamaha desks.
+			expect(bridge.hellos[0].consoles).toEqual(['dlive', 'sq', 'wing', 'digico', 'avantis', 'yamaha'])
+			fresh.stop()
+		})
+
+		it('skips the cold sync on a verified desk, and says so without crying refusal', async () => {
+			// Found while auditing for 4 Nov. The cold sync is right to skip a
+			// family that isn't a dLive — `query` carries dLive-shaped Gets,
+			// which earn one bad_intent per strip there, and the mirror has the
+			// values anyway — but it used to say so through refuseForeign, so a
+			// Wing the module was driving happily logged "query isn't sent on a
+			// Wing: it is encoded as dLive bytes, which mean something else
+			// there." That reads as a refusal of something the operator wanted.
+			link.stop()
+			bridge.console = { driver: 'wing', title: 'Wing', verified_on_desk: true }
+			bridge.cmds.length = 0
+			const fresh = new BridgeLink({
+				host: '127.0.0.1',
+				port: bridge.port,
+				laneName: 'wing-coldsync',
+				baseChannel: 1,
+				retryMs: 50,
+				strips: [
+					{ type: 'input', index: 1 },
+					{ type: 'input', index: 2 },
+				],
+			})
+			const said: string[] = []
+			fresh.on('log', (_l, m) => said.push(m))
+			fresh.start()
+			await waitFor(() => fresh.status === 'ok', 'ok')
+			await new Promise((r) => setTimeout(r, 100))
+			// no Gets at all, which is the behaviour that was always right
+			expect(bridge.cmds.some((c) => (c.body.intent as { op?: string }).op === 'query')).toBe(false)
+			// and nothing claiming a refusal on a desk we are driving
+			expect(said.some((m) => m.includes('dLive bytes'))).toBe(false)
+			expect(said.some((m) => m.includes('No cold sync on a Wing'))).toBe(true)
 			fresh.stop()
 		})
 
