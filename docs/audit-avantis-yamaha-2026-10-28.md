@@ -123,6 +123,23 @@ What does not work:
    and `999,Finale` with "scene must be 1–500". Every scene-name variable
    and every scene preset on those desks is therefore empty.
 
+   And a scene's number **can be changed at the desk** (RENAME, RIVAGE
+   PM manual p. 811, same source and the same secondhand caveat). So on a
+   Rivage neither the place nor the number is stable: #326 exists because
+   places move when a snapshot is inserted, and now the number moves too.
+   A button pinned to 2.50 can recall something else after a renumber,
+   silently, which is the one failure mode a scene recall must not have.
+
+   There is already a pattern for this in the API, and it is worth
+   reusing rather than inventing: the SD's pinned macro takes
+   `{"op": "action", "macro": 4, "macro_name": "dim"}` and fires **only**
+   if macro 4 is still named "dim", on one macro only, else 400. The same
+   guard on a scene — a number plus the name it is expected to carry —
+   would make a pinned scene button safe on a desk that renumbers, and it
+   would read the same way to anyone who already knows the macro one.
+   Suggested to the driver and API threads; not this module's to decide,
+   and nothing is built for it.
+
    The driver's canonical form, for what it is worth to the decision
    below, is **two decimals**: `"2.50"`, and on a DM7 the scene key is
    `"A 2.50"` / `"B 1.00"` with the list first (DEV: Yamaha driver, 28
@@ -154,6 +171,21 @@ the family can't say — so an Avantis or a Yamaha that reports neither
 leaves `linked_*` and `width_*` empty rather than claiming "not linked".
 Neither research document mentions a link or width report for either
 desk, which is exactly the case the fix was written for.
+
+**Updated 28 Oct, and it lands on the good side.** DEV: Yamaha driver,
+reading the RIVAGE PM manual pp. 138–141 (the operator's copy, sent
+tonight; this reaches here secondhand, so it is their reading of a
+document rather than mine), reports that a Rivage's stereo is **linked
+pairs**: adjacent input channels, odd/even or even/odd, and MIX and
+MATRIX buses odd/even. That is the SQ's `{linked, half, partner}` shape,
+which this module has read since `550c3ba`, and not the SD's `{width}`.
+
+So if Monday's B5 finds the pair leaf, a Rivage's links should appear in
+`linked_*`, `half_*` and `partner_*` with no module change at all — and
+the partner feedback's expression index, which exists because a channel
+picker needs the partner of whatever it is pointed at, should work there
+too. Worth putting on Wednesday's list precisely because it costs
+nothing to try: it either works or it tells us something.
 
 ## 6. Names and colours
 
