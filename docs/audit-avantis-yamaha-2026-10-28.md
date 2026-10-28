@@ -175,6 +175,31 @@ What does not work:
    `scene_number`, which is another 1–2 h on §9's table, plus the flag
    reader and the refusal path.
 
+   And one more piece, if Tuesday's B6 finds the Yamaha has no scene
+   list: the prefetch. `{"op": "query", "type": "scene", "scene_number",
+"scene_list", "fields": ["name"]}` after connect and after every
+   `connection` event, for each pinned key, so a pinned press never meets
+   the 503. That is implementable here — Companion reports an action
+   instance through `subscribe` / `unsubscribe`, which this module
+   already uses for feedbacks — but it reaches only **literal** pins.
+   `scene_number` takes an expression on purpose, and a computed number
+   has no value at subscribe time, so there is nothing to prefetch and
+   the 503 window stays exactly as wide for those keys. An operator
+   cannot tell the two apart by looking at the button, which is why it
+   needs saying out loud rather than leaving "pins are prefetched" as the
+   sentence anyone remembers. A pin on a computed number is a
+   contradiction — a name captured when the key was made cannot be right
+   for a number that changes at press time — so **this module refuses
+   that combination locally, with a sentence**. Agreed with the driver
+   thread on 28 Oct, and DEV: Multi-console apps is asked for a doc line
+   saying a pin is meant for a fixed number, so that "pins are
+   prefetched" cannot be misremembered for picker buttons.
+
+   Also new, and this one is plain work: the answer path has five
+   segments, and `deltaToEvent` drops anything that isn't three (or
+   `scene.current`). Decoding `scene.by_number.<list>.<hundredths>.name`
+   is part of the scene-list piece above, not extra.
+
    One thing to settle with them before it is built, because it is this
    module's behaviour and not theirs: a 503 is **not** retried here. The
    code deliberately drops a refused scene recall and logs it, because a
@@ -196,6 +221,19 @@ What does not work:
    a lossy spelling of a number the desk writes with two places. A new
    spelling has to be chosen (`scene_name_12_50` reads correctly and is
    additive; the existing integer names must keep theirs exactly).
+
+   **The Client API has since hit the same problem and answered it**
+   (DEV: Multi-console apps, 28 Oct): a prefetched scene name arrives as
+   a delta on `scene.by_number.<list>.<hundredths>.name`, so 2.50 is
+   `scene.by_number.A.250.name`, and `-` stands in for the list on a desk
+   that has none. Hundredths precisely so no dot sits inside a path
+   segment. That does not bind a Companion variable id, and I would not
+   copy it: `scene_name_250` reads as scene two hundred and fifty to the
+   person holding the surface, which is worse than a dot. But it settles
+   that the dot is a real constraint and not my fussiness, and `_` for the
+   point is the same trick with a readable face. **Still the operator's
+   call.**
+
 3. **The DM7's two lists are not expressible at all.** It recalls
    `scene_a "4.00"` or `scene_b` (RESEARCH-YA §1), and nothing in the
    intent this module builds can say which list. That needs a new
