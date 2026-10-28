@@ -934,7 +934,18 @@ export function deltaToEvent(path: string, value: unknown): ConsoleEvent | undef
 		// empty). A bare number is still accepted — no spec or fixture says a
 		// family sends one, but it costs nothing and an older bridge is not
 		// worth guessing about.
-		const raw = typeof value === 'object' && value !== null ? (value as { number?: unknown }).number : value
+		// `number` is the place. A desk that cannot list its scenes has no
+		// place to give and sends `number: null` with the screen number in
+		// `scene_number` (DEV: Yamaha driver, 28 Oct, for a Yamaha whose
+		// profile says `places: false`). Falling back to it only when `number`
+		// is absent or null keeps every desk that has places reading exactly
+		// as before, and stops the variable going blank on one that doesn't —
+		// which is this same bug over again. NOT YET IN THE SPEC: the shape is
+		// a driver thread's word until it reaches fixtures/api/exchanges.json,
+		// due 2 Nov, and the test for it says so.
+		const o =
+			typeof value === 'object' && value !== null ? (value as { number?: unknown; scene_number?: unknown }) : null
+		const raw = o ? (o.number ?? o.scene_number) : value
 		const n = Number(raw)
 		// Finite, not integer: an SD11's snapshots are numbered 1.50 and such
 		// (27 Oct), and no fixture yet says what it puts here. An integer test

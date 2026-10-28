@@ -771,6 +771,26 @@ describe('BridgeLink', () => {
 		expect(deltaToEvent('scene.current', value)).toEqual({ kind: 'scene', scene: 4 })
 		// a bare number is tolerated too; nothing says a family sends one
 		expect(deltaToEvent('scene.current', 12)).toEqual({ kind: 'scene', scene: 12 })
+		// A DM7 adds a third key, because it has two scene lists: scene.current
+		// is {number, name, scene_list} there. Reading `number` and ignoring
+		// the rest is what makes that free — the list itself is the scene_list
+		// work, which waits for the Client API shape and its fixture.
+		expect(deltaToEvent('scene.current', { number: 2.5, name: 'Verse', scene_list: 'B' })).toEqual({
+			kind: 'scene',
+			scene: 2.5,
+		})
+		// And a desk that cannot list its scenes has no place to give: number
+		// is null and the screen number is in scene_number. Without the
+		// fallback this is #342 all over again, on a different desk.
+		expect(deltaToEvent('scene.current', { number: null, scene_number: 2.5, name: 'Verse', scene_list: 'A' })).toEqual({
+			kind: 'scene',
+			scene: 2.5,
+		})
+		// Both shapes are DEV: Yamaha driver's word as of 28 Oct and NOT yet in
+		// fixtures/api/exchanges.json — due 2 Nov. When it lands, this test
+		// should read the case out of the fixture the way the one above it
+		// does, and these literals should go.
+		expect(deltaToEvent('scene.current', { number: null, name: 'Verse' })).toBeUndefined()
 		// an SD's snapshot number is decimal, and dropping it would be the
 		// same silent loss this bug was
 		expect(deltaToEvent('scene.current', { number: 1.5 })).toEqual({ kind: 'scene', scene: 1.5 })
