@@ -22,7 +22,13 @@ export type Intent =
 	// is the number the desk shows, which carries decimals on a DiGiCo (1.50
 	// sits between 1 and 2). BridgeLink picks the one the console understands
 	// from scenes.by_number; both ride along so the choice is made there.
-	| { op: 'scene'; scene: number; scene_number?: number }
+	//
+	// `scene_list` names which list the number is in, on a desk that keeps
+	// more than one — a DM7 Compact's A and B (Client API v1 §8, `scenes.lists`).
+	// It is bridge-only, like `scene_number`: no dLive byte carries it, and
+	// BridgeLink strips it on a console that declares no lists, because the
+	// bridge answers 400 `bad_intent` for a list on a desk that has none.
+	| { op: 'scene'; scene: number; scene_number?: number; scene_list?: string }
 	| { op: 'cue_list'; id: number }
 	| { op: 'surface_cc'; cc: number; value: number }
 	| { op: 'action'; cc: number; value: number }

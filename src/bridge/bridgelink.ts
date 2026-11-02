@@ -174,6 +174,25 @@ export function sceneByNumber(info: Record<string, unknown>): boolean {
 	return (scenes as { by_number?: unknown }).by_number === true
 }
 
+/**
+ * The scene lists this console keeps, such as a DM7 Compact's `["A", "B"]`
+ * (Client API v1 §8, `scenes.lists`). Empty on a desk with one list, which
+ * is every other desk we have met.
+ *
+ * Read it from the `console` EVENT as well as from /info: §8 says the block
+ * "can change once the desk says its model", and a Yamaha's model is only
+ * known once the desk has answered with its name.
+ */
+export function sceneLists(info: Record<string, unknown>): string[] {
+	const block = info.console
+	if (typeof block !== 'object' || block === null) return []
+	const scenes = (block as { scenes?: unknown }).scenes
+	if (typeof scenes !== 'object' || scenes === null) return []
+	const lists = (scenes as { lists?: unknown }).lists
+	if (!Array.isArray(lists)) return []
+	return lists.filter((l): l is string => typeof l === 'string' && l !== '')
+}
+
 /** The bridge says this console's driver has been run against a real desk. */
 export function familyVerified(info: Record<string, unknown>): boolean {
 	const block = info.console
@@ -229,6 +248,8 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	private familyVerified = false
 	/** this desk names its scenes by number, not by place in a list */
 	private sceneByNumber = false
+	/** the scene lists this desk declares, or empty where it keeps one */
+	private sceneListsDeclared: string[] = []
 	private saidForeign = false
 	private readonly saidScaled = new Set<string>()
 	private baseN: number
@@ -303,6 +324,11 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		}
 		if (this.refuseForeign(intent.op)) return false
 		const outgoing = intent.op === 'scene' ? this.sceneForConsole(intent) : intent
+		// A scene recall this console cannot be asked for is refused HERE, not
+		// sent and refused there: a 400 comes back after the press, and we do
+		// not retry one (#318), so the operator would be left with a button
+		// that did nothing and a line in the bridge's log, not ours.
+		if (!outgoing) return false
 		void this.postIntent(outgoing)
 		const local = localEvent(outgoing)
 		if (local) {
@@ -390,16 +416,59 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	 * share, or any recall taken while it is re-reading the list (MIDI Bridge
 	 * 1.4.111, #289), and that refusal is logged.
 	 */
-	private sceneForConsole(intent: Extract<Intent, { op: 'scene' }>): Intent {
+	private sceneForConsole(intent: Extract<Intent, { op: 'scene' }>): Intent | null {
+		const asked = (intent.scene_list ?? '').trim()
+		const { scene_list: _asked, ...plain } = intent
+		let out: Extract<Intent, { op: 'scene' }>
 		if (!this.sceneByNumber) {
-			const { scene_number: _unused, ...byPlace } = intent
-			return byPlace
+			const { scene_number: _unused, ...byPlace } = plain
+			out = byPlace
+		} else {
+			// An empty box falls back to the Scene field, so a button built before
+			// this option existed recalls the number its own label claims.
+			const number = plain.scene_number ?? plain.scene
+			const { scene: _place, ...rest } = plain
+			out = { ...rest, scene_number: number } as Extract<Intent, { op: 'scene' }>
 		}
-		// An empty box falls back to the Scene field, so a button built before
-		// this option existed recalls the number its own label claims.
-		const number = intent.scene_number ?? intent.scene
-		const { scene: _place, ...rest } = intent
-		return { ...rest, scene_number: number } as Intent
+		if (asked === '') return out
+		const list = this.resolveSceneList(asked)
+		return list === null ? null : { ...out, scene_list: list }
+	}
+
+	/**
+	 * The desk's own spelling of the list the button asked for, or null to
+	 * refuse the press.
+	 *
+	 * An undeclared list, and any list at all on a console with none, is 400
+	 * `bad_intent` at the bridge (spec §8). Refusing here instead says which
+	 * button it was and what the desk actually offers, and says it before the
+	 * press leaves — the alternative is a recall that quietly went to list A.
+	 * Each press says it: a scene recall is one deliberate press, not a stream
+	 * like a fader, and a show button that did nothing has to be loud.
+	 */
+	private resolveSceneList(asked: string): string | null {
+		const lists = this.sceneListsDeclared
+		if (lists.length === 0) {
+			this.emit(
+				'log',
+				'warn',
+				`Nothing recalled: this console keeps one scene list, so there is no list "${asked}" to recall from. ` +
+					`Clear the Scene list box on the button.`,
+			)
+			return null
+		}
+		if (lists.includes(asked)) return asked
+		// The desk's spelling wins where the typing differs only in case: "b"
+		// for a DM7's "B" can only have meant that list, and a show button that
+		// fails on a capital is a bad trade. An ambiguous match is still refused.
+		const fold = lists.filter((l) => l.toLowerCase() === asked.toLowerCase())
+		if (fold.length === 1) return fold[0]
+		this.emit(
+			'log',
+			'warn',
+			`Nothing recalled: this console has no scene list "${asked}". It offers ${lists.map((l) => `"${l}"`).join(' and ')}.`,
+		)
+		return null
 	}
 
 	/** One log line per reason, not one per press. */
@@ -610,6 +679,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		this.foreignFamily = foreignFamily(info.json)
 		this.familyVerified = familyVerified(info.json)
 		this.sceneByNumber = sceneByNumber(info.json)
+		this.sceneListsDeclared = sceneLists(info.json)
 
 		// 2. hello
 		await this.hello()
@@ -712,6 +782,53 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		}
 		if (changed.length) this.emit('changed', changed)
 		this.emit('log', 'debug', `mirror snapshot: ${Object.keys(snapshot).length} paths (${why})`)
+	}
+
+	/**
+	 * The console block, re-read from the `console` event.
+	 *
+	 * The bridge re-sends the whole block whenever it changes (spec §1b: "An
+	 * SSE `console` event carries the whole block"), and two of the things it
+	 * carries are not knowable at connect:
+	 *
+	 * - **`verified_on_desk` on a family verified per model.** The Yamaha
+	 *   driver is checked on the Rivage PM5 and on the DM7 Compact
+	 *   separately, and the bridge can only say which desk it is once that
+	 *   desk has answered with its name. Reading the block at connect alone
+	 *   left this connection refusing every write for the whole session on a
+	 *   desk the bridge had meanwhile verified — the gate of audit §1,
+	 *   failing for a reason no operator could see.
+	 * - **`scenes.lists`**, for the same reason: §8 says to read it from
+	 *   here, because the block "can change once the desk says its model".
+	 *
+	 * Only the gate and the scene shape are re-read. The strips, the mirror
+	 * and the stream are untouched: a block that says more about the desk we
+	 * are already talking to is not a reconnect.
+	 */
+	private applyConsoleBlock(payload: Record<string, unknown>): void {
+		const block = payload.console
+		if (typeof block !== 'object' || block === null) return
+		const info = { console: block }
+		const wasFamily = this.foreignFamily
+		const wasVerified = this.familyVerified
+		this.foreignFamily = foreignFamily(info)
+		this.familyVerified = familyVerified(info)
+		this.sceneByNumber = sceneByNumber(info)
+		this.sceneListsDeclared = sceneLists(info)
+		if (this.foreignFamily === wasFamily && this.familyVerified === wasVerified) return
+		// The gate moved. Let every refusal be said once more — the reasons
+		// they were said for have just changed — and put the new answer on the
+		// connection, which is the only place an operator sees it.
+		this.saidForeign = false
+		this.saidScaled.clear()
+		if (this.foreignFamily && this.familyVerified && !wasVerified) {
+			this.emit(
+				'log',
+				'info',
+				`MIDI Bridge has verified its ${this.foreignFamily} driver on a desk, so this connection will drive it now.`,
+			)
+		}
+		this.applyConsoleState()
 	}
 
 	private applyConsoleState(): void {
@@ -843,7 +960,15 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 				return
 			}
 			case 'scene': {
-				const ev: ConsoleEvent = { kind: 'scene', scene: Number(payload.number) }
+				// `number` is the place. A desk whose recall has no place to
+				// resolve to sends `number: null` and puts the number on screen
+				// in `scene_number` (spec §8, "A recall that stays a number";
+				// the Yamaha's). `Number(null)` is 0, so the current scene went
+				// to 0 on every recall there — #342 a second time, in the
+				// stream rather than the snapshot.
+				const n = Number(payload.number ?? payload.scene_number)
+				if (!Number.isFinite(n) || n < 1) return
+				const ev: ConsoleEvent = { kind: 'scene', scene: n }
 				this.emit('event', ev, 'mixrack')
 				const changed = this.state.apply(ev)
 				if (changed.length) this.emit('changed', changed)
@@ -852,6 +977,10 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			case 'connection': {
 				this.consoleState = typeof payload.console === 'string' ? payload.console : 'down'
 				this.applyConsoleState()
+				return
+			}
+			case 'console': {
+				this.applyConsoleBlock(payload)
 				return
 			}
 			case 'ack': {

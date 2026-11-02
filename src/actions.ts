@@ -63,14 +63,19 @@ function num(o: Opts, key: string, dflt = 0): number {
  * `scene` so an existing button recalls the number its label already claims.
  */
 function sceneIntent(o: Opts): Intent {
+	// An empty box is NO LIST, never an empty one: the bridge answers 400
+	// `bad_intent` for `scene_list: ""`, and "no pin means no field" is the
+	// same rule the scene-name pin is written to (Client API v1 §8).
+	const list = str(o, 'scene_list').trim()
+	const inList = list === '' ? {} : { scene_list: list }
 	const typed = str(o, 'scene_number').trim()
 	if (typed !== '') {
 		const n = Number(typed)
 		if (!Number.isFinite(n) || n <= 0) throw new Error(`"${typed}" is not a scene number (try 4 or 1.5)`)
-		return { op: 'scene', scene_number: n, scene: Math.round(num(o, 'scene', 1)) }
+		return { op: 'scene', scene_number: n, scene: Math.round(num(o, 'scene', 1)), ...inList }
 	}
 	const scene = Math.round(num(o, 'scene', 1))
-	return { op: 'scene', scene_number: scene, scene }
+	return { op: 'scene', scene_number: scene, scene, ...inList }
 }
 
 function str(o: Opts, key: string, dflt = ''): string {
@@ -575,6 +580,17 @@ export function buildActions(ctx: ModuleContext): CompanionActionDefinitions<Act
 						'Only used on a console that numbers its scenes, such as a DiGiCo, where an inserted ' +
 						'snapshot is numbered 1.50. Leave this empty and the Scene field above is used as the ' +
 						'number. Accepts an expression.',
+					default: '',
+					useVariables: true,
+				},
+				{
+					type: 'textinput',
+					id: 'scene_list',
+					label: 'Scene list (only where the desk keeps more than one)',
+					tooltip:
+						'A Yamaha DM7 keeps two scene lists, A and B. Name one here to recall from it. ' +
+						'Leave this empty on every other console — a list named on a desk that keeps one ' +
+						'refuses the recall rather than guessing. Accepts an expression.',
 					default: '',
 					useVariables: true,
 				},

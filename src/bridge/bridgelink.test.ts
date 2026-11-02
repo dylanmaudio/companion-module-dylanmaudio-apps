@@ -1090,5 +1090,175 @@ describe('BridgeLink', () => {
 			expect(bridge.cmds.some((c) => (c.body.intent as { op?: string }).op === 'raw')).toBe(false)
 			fresh.stop()
 		})
+
+		it('opens the gate when the console event says the desk is verified', async () => {
+			// The Yamaha driver is verified PER MODEL — the Rivage PM5 and the
+			// DM7 Compact are separate commits — and MIDI Bridge can only say
+			// which desk it is once the desk has answered with its name. So the
+			// block at connect can say "not verified" and the console event say
+			// otherwise a moment later. Reading /info alone left the connection
+			// refusing every write for the rest of the session (spec §1b: "An
+			// SSE `console` event carries the whole block").
+			link.stop()
+			bridge.console = { driver: 'yamaha', title: 'Rivage PM5', verified_on_desk: false }
+			bridge.cmds.length = 0
+			const statuses: string[] = []
+			const fresh = new BridgeLink({
+				host: '127.0.0.1',
+				port: bridge.port,
+				laneName: 'yamaha-late',
+				baseChannel: 1,
+				retryMs: 50,
+			})
+			fresh.on('status', (s) => statuses.push(s))
+			fresh.start()
+			await waitFor(() => bridge.hellos.length > 0, 'connect')
+			await waitFor(() => fresh.status === 'failure', 'refused at first')
+			expect(fresh.send({ op: 'scene', scene: 2 })).toBe(false)
+
+			await waitFor(() => bridge.streamOpen, 'stream')
+			bridge.pushEvent('console', {
+				console: { driver: 'yamaha', title: 'Rivage PM5', model: 'DSP-RX', verified_on_desk: true },
+				family: 'yamaha',
+			})
+			await waitFor(() => fresh.status === 'ok', 'gate opens')
+			expect(fresh.send({ op: 'scene', scene: 2 })).toBe(true)
+			await waitFor(() => bridge.cmds.some((c) => (c.body.intent as { op?: string }).op === 'scene'), 'recall')
+			expect(statuses).toContain('ok')
+			fresh.stop()
+		})
+
+		it('shuts the gate again if the console event takes the verification away', async () => {
+			link.stop()
+			bridge.console = { driver: 'yamaha', title: 'DM7 Compact', verified_on_desk: true }
+			const fresh = new BridgeLink({
+				host: '127.0.0.1',
+				port: bridge.port,
+				laneName: 'yamaha-unverified',
+				baseChannel: 1,
+				retryMs: 50,
+			})
+			fresh.start()
+			await waitFor(() => bridge.hellos.length > 0, 'connect')
+			await waitFor(() => fresh.status === 'ok', 'driven at first')
+			await waitFor(() => bridge.streamOpen, 'stream')
+			bridge.pushEvent('console', {
+				console: { driver: 'yamaha', title: 'DM7 Compact', verified_on_desk: false },
+				family: 'yamaha',
+			})
+			await waitFor(() => fresh.status === 'failure', 'gate shuts')
+			expect(fresh.send({ op: 'scene', scene: 2 })).toBe(false)
+			fresh.stop()
+		})
+	})
+
+	describe('a desk that keeps more than one scene list', () => {
+		const dm7 = (lists: string[] | undefined) => ({
+			driver: 'yamaha',
+			title: 'DM7 Compact',
+			verified_on_desk: true,
+			scenes: { noun: 'Scene', by_number: true, ...(lists ? { lists } : {}) },
+		})
+
+		const laneFor = async (consoleBlock: Record<string, unknown>, name: string) => {
+			link.stop()
+			bridge.console = consoleBlock
+			bridge.cmds.length = 0
+			const logs: string[] = []
+			const fresh = new BridgeLink({
+				host: '127.0.0.1',
+				port: bridge.port,
+				laneName: name,
+				baseChannel: 1,
+				retryMs: 50,
+			})
+			fresh.on('log', (level, msg) => logs.push(`${level}: ${msg}`))
+			fresh.start()
+			await waitFor(() => bridge.hellos.length > 0, 'connect')
+			await waitFor(() => fresh.status === 'ok', 'ok')
+			return { fresh, logs }
+		}
+
+		const scenesSent = () =>
+			bridge.cmds.map((c) => c.body.intent as Record<string, unknown>).filter((i) => i?.op === 'scene')
+
+		it('sends the list the button names, with the number the desk uses', async () => {
+			const { fresh } = await laneFor(dm7(['A', 'B']), 'dm7-b')
+			expect(fresh.send({ op: 'scene', scene: 3, scene_number: 2.5, scene_list: 'B' })).toBe(true)
+			await waitFor(() => scenesSent().length > 0, 'recall')
+			// by_number, so the place is stripped and the list rides along
+			expect(scenesSent()[0]).toEqual({ op: 'scene', scene_number: 2.5, scene_list: 'B' })
+			fresh.stop()
+		})
+
+		it("takes the desk's spelling when only the case differs", async () => {
+			const { fresh } = await laneFor(dm7(['A', 'B']), 'dm7-case')
+			expect(fresh.send({ op: 'scene', scene: 1, scene_number: 1, scene_list: 'b' })).toBe(true)
+			await waitFor(() => scenesSent().length > 0, 'recall')
+			expect(scenesSent()[0].scene_list).toBe('B')
+			fresh.stop()
+		})
+
+		it('refuses a list the desk does not have, before the press leaves', async () => {
+			const { fresh, logs } = await laneFor(dm7(['A', 'B']), 'dm7-c')
+			expect(fresh.send({ op: 'scene', scene: 1, scene_number: 1, scene_list: 'C' })).toBe(false)
+			await new Promise((r) => setTimeout(r, 80))
+			expect(scenesSent()).toEqual([])
+			expect(logs.some((l) => l.startsWith('warn:') && l.includes('"A" and "B"'))).toBe(true)
+			fresh.stop()
+		})
+
+		it('refuses a list on a desk that keeps one, rather than recalling from the only one', async () => {
+			// 400 bad_intent at the bridge (spec §8). Refused here instead, so
+			// the sentence names the button's own box — and so a recall never
+			// quietly lands in list A on a desk with no lists at all.
+			const { fresh, logs } = await laneFor(dm7(undefined), 'dm7-nolists')
+			expect(fresh.send({ op: 'scene', scene: 1, scene_number: 1, scene_list: 'B' })).toBe(false)
+			await new Promise((r) => setTimeout(r, 80))
+			expect(scenesSent()).toEqual([])
+			expect(logs.some((l) => l.startsWith('warn:') && l.includes('one scene list'))).toBe(true)
+			// and with the box empty the same button recalls as it always did
+			expect(fresh.send({ op: 'scene', scene: 1, scene_number: 1 })).toBe(true)
+			await waitFor(() => scenesSent().length > 0, 'recall')
+			expect(scenesSent()[0]).toEqual({ op: 'scene', scene_number: 1 })
+			fresh.stop()
+		})
+
+		it('reads the lists from the console event, not only from /info', async () => {
+			// §8: the block "can change once the desk says its model", so the
+			// lists arrive with the model on a desk whose model is asked for.
+			const { fresh } = await laneFor(dm7(undefined), 'dm7-late-lists')
+			expect(fresh.send({ op: 'scene', scene: 1, scene_number: 1, scene_list: 'B' })).toBe(false)
+			await waitFor(() => bridge.streamOpen, 'stream')
+			bridge.pushEvent('console', { console: dm7(['A', 'B']), family: 'yamaha' })
+			await waitFor(() => {
+				// the gate didn't move, so nothing is logged: ask by sending
+				return fresh.send({ op: 'scene', scene: 1, scene_number: 1, scene_list: 'B' })
+			}, 'lists arrive')
+			await waitFor(() => scenesSent().length > 0, 'recall')
+			expect(scenesSent()[0]).toEqual({ op: 'scene', scene_number: 1, scene_list: 'B' })
+			fresh.stop()
+		})
+
+		it('keeps the current scene on a recall a desk reports with no place (#342 in the stream)', async () => {
+			// The Yamaha's own recall announcement: `number` null, the number on
+			// screen in `scene_number`. `Number(null)` is 0, so this used to set
+			// the current scene to 0 on every recall.
+			const { fresh } = await laneFor(dm7(['A', 'B']), 'dm7-stream-scene')
+			const scenes: number[] = []
+			fresh.on('event', (ev) => {
+				if (ev.kind === 'scene') scenes.push(ev.scene)
+			})
+			await waitFor(() => bridge.streamOpen, 'stream')
+			bridge.pushEvent('scene', { number: null, scene_number: 2.5, name: 'Verse', scene_list: 'B' })
+			await waitFor(() => scenes.length > 0, 'scene event')
+			expect(scenes[0]).toBe(2.5)
+			expect(fresh.state.currentScene).toBe(2.5)
+			// and a desk that has no number at all says nothing, rather than 0
+			bridge.pushEvent('scene', { number: null, name: 'Verse' })
+			await new Promise((r) => setTimeout(r, 60))
+			expect(scenes).toEqual([2.5])
+			fresh.stop()
+		})
 	})
 })

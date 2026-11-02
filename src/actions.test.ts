@@ -67,6 +67,24 @@ describe('Surface-socket actions', () => {
 		expect(sent).toEqual([{ op: 'scene', scene: 2, scene_number: 1.5 }])
 	})
 
+	it('carries the scene list only when the button names one', async () => {
+		// A DM7 Compact keeps two lists (Client API v1 §8). An EMPTY box must
+		// send no field at all: the bridge answers 400 bad_intent for
+		// `scene_list: ""`, so an empty string would refuse every recall on
+		// every desk. BridgeLink drops the field again where the console
+		// declares no lists.
+		const { ctx, sent } = ctxOf()
+		const defs = buildActions(ctx)
+		await defs.scene_recall?.callback({ options: { scene: 1, scene_number: '2.5', scene_list: 'B' } }, {})
+		await defs.scene_recall?.callback({ options: { scene: 1, scene_number: '2.5', scene_list: '' } }, {})
+		await defs.scene_recall?.callback({ options: { scene: 1, scene_number: '2.5', scene_list: '  ' } }, {})
+		expect(sent).toEqual([
+			{ op: 'scene', scene: 1, scene_number: 2.5, scene_list: 'B' },
+			{ op: 'scene', scene: 1, scene_number: 2.5 },
+			{ op: 'scene', scene: 1, scene_number: 2.5 },
+		])
+	})
+
 	it('refuses a scene number that is not one, rather than recalling something else', async () => {
 		// run() logs and swallows, as it does for a bad dB value: a typo must
 		// not fall back to the Scene field and recall a different snapshot.
