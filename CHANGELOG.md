@@ -2,6 +2,25 @@
 
 ## Unreleased (1.1.9x test line, not for the store)
 
+- **A desk the bridge verifies while you are connected now works** without
+  reconnecting. MIDI Bridge re-sends its console block whenever it changes,
+  and the module was reading it only at connect — so on a console the bridge
+  can only identify after asking the desk its model (a Yamaha: the Rivage
+  PM5 and the DM7 Compact are verified separately), the connection could sit
+  there saying "this module version drives a dLive only" for the whole
+  session on a desk it was free to drive. The scene settings are re-read from
+  the same block.
+- **The current scene survives a recall on a desk that numbers its scenes
+  and has no list of places** (a Yamaha). The desk announces the recall with
+  no place and the number on screen beside it; the module read the place,
+  and so put the current scene at 0 on every recall. Same cause as the
+  snapshot fix above it in this list, in the live stream rather than at
+  connect.
+- **Scene recall takes a scene list.** A Yamaha DM7 keeps two, A and B. A
+  new **Scene list** box names one; empty means the desk's only list, which
+  is every other console. A list the desk does not have recalls nothing and
+  says so, rather than silently recalling from the other one.
+
 - **Linked stereo pairs are no longer invisible** (#268). MIDI Bridge
   reports `{linked, half, partner}` per strip and the module was dropping
   it, so a pair looked like two unrelated strips: a fader move on one

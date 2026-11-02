@@ -45,6 +45,37 @@ watched.
 Who flips it and when is the bridge's call, not this module's. It wants
 deciding before the day, not on it.
 
+### 1b. What the rig actually says, 3 Nov — and the module's half of it
+
+Read on the monorepo, read-only: the three verified commits exist and are
+**held off the rig on purpose**. `topic/avantis-verified-4` 3d0188ed:
+"Applied on the rig at the desk with RESEARCH's `apply <SHA>` once MIDI
+Bridge's acceptance on the shop's Avantis passes (Wed 4 Nov 2026); never
+on main before those RESULTS." The two Yamaha ones say the same, per
+model (`topic/yamaha-verified-rivage` 5c06d69f, `topic/yamaha-verified-dm7`
+4529aca4). `test/shop-rig` (91e0c707) carries the scene vocabulary and the
+per-type counts; it does **not** carry any of the three.
+
+So on Wednesday the gate is shut when each desk starts and opens partway
+through the day, per desk, when RESEARCH applies that desk's SHA. Two
+consequences, one each way:
+
+- **Sequencing, for the day:** Companion is fourth on each desk, so its
+  slot is probably after the apply anyway — but it is after the apply only
+  if the bridge was restarted into it. Worth saying out loud on the day
+  rather than discovering it at the desk.
+- **Ours, and it was a real bug:** the module read the console block *only
+  at connect*, and ignored the `console` event the bridge sends whenever
+  the block changes (SPEC §1b: "An SSE `console` event carries the whole
+  block"). A Yamaha is verified **per model**, and the bridge can only say
+  which model it is once the desk has answered — so the block at connect
+  could say "not verified" and the event say otherwise a second later, and
+  this module would have refused every write for the rest of the session
+  on a desk the bridge was happy to drive. Fixed 3 Nov (69635f4): the
+  gate, `by_number` and `scenes.lists` are re-read from the event, and the
+  connection's status follows. Nothing else is re-read — a block that says
+  more about the desk we are already talking to is not a reconnect.
+
 ## 2. CONSOLES, and the one line that must change
 
 `CONSOLES = ['dlive', 'sq', 'wing', 'digico']` is sent at hello (CODE
@@ -239,6 +270,31 @@ What does not work:
    intent this module builds can say which list. That needs a new
    additive option on `scene_recall`, in the shape the bridge defines —
    and the bridge has not defined it. Blocked, cheap once unblocked.
+
+   **Unblocked and built, 3 Nov** (69635f4). The shape is in the rig's own
+   doc and fixtures (`topic/mb-scene-vocab-rig` 8003fe93, merged to
+   `test/shop-rig` as cfa3ee77), not a thread's word for it: the console
+   block carries `scenes.lists`, such as `["A", "B"]`; `"scene_list": "B"`
+   picks one; without it a recall goes to the first; an undeclared list, or
+   any `scene_list` on a console with no `lists`, is 400 `bad_intent`. Three
+   decisions were this module's and are worth recording, because each one
+   could have gone the lazy way:
+
+   - **An empty box sends no field at all**, never `""` — an empty string
+     is `bad_intent`, so it would have refused every recall on every desk.
+     The same rule the pin is written to: "no pin means no field".
+   - **A list the desk hasn't got refuses the press here**, with a sentence
+     naming what the desk does offer, instead of being sent and refused
+     there. A 400 arrives after the press, we don't retry one (#318), and
+     the only alternative to refusing is a recall that quietly lands in
+     list A — the #55 class of failure.
+   - **The desk's spelling wins where only the case differs**: "b" can only
+     have meant a DM7's "B", and a show button that fails on a capital is a
+     bad trade. An ambiguous match is still refused.
+
+   The lists are read from the `console` **event** as well as `/info`, as
+   §8 says to: the block "can change once the desk says its model", and a
+   Yamaha's model is only known once the desk has answered. See §1b.
 4. The scene **list** in the state (`scene.<n>.number` / `scene.<n>.name`,
    SPEC) is read by the bridge for a by_number desk, and this module does
    not consume it at all. Adopting it would fix (1) without the operator
@@ -361,13 +417,15 @@ Code first, because it is the small half:
 
 | Piece                                                                                 | Size                  | Blocked on                                             |
 | ------------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------ |
-| `CONSOLES` += two ids                                                                 | minutes               | the two drivers' ids                                   |
+| `CONSOLES` += two ids                                                                 | minutes               | **done** 7e0f8c7, sourced 09c9b2f                      |
 | Scene names: widen the parser, choose the decimal spelling, keep integers as they are | half a day with tests | nothing                                                |
 | Adopt the bridge's scene list for by_number desks                                     | half a day            | nothing; supersedes most of the above for the operator |
-| DM7 list A/B option on `scene_recall`                                                 | 1–2 h                 | the bridge's intent shape                              |
-| Adopt `types[].count` for scope                                                       | a day with tests      | nothing                                                |
-| HELP wording: Avantis feedback starts blank; which desks are gated                    | 1–2 h                 | nothing                                                |
-| §7b: the cold-sync log line on a verified foreign desk                                | under an hour         | nothing                                                |
+| DM7 list A/B option on `scene_recall`                                                 | 1–2 h                 | **done** 69635f4 (the shape landed 3 Nov; §4.3)        |
+| Adopt `types[].count` for scope                                                       | a day with tests      | nothing (deferred past Wednesday on ROADMAP's word)    |
+| Re-read the console block from its event (not sized; found while doing the above)     | an hour with tests    | **done** 69635f4 (§1b)                                 |
+| The `scene` stream event's number on a desk with no places                            | minutes               | **done** 69635f4 (#342's class, a second site)         |
+| HELP wording: Avantis feedback starts blank; which desks are gated                    | 1–2 h                 | **done** 7e0f8c7, and the late gate 3 Nov              |
+| §7b: the cold-sync log line on a verified foreign desk                                | under an hour         | **done** 7e0f8c7                                       |
 | Colour feedback beyond the dLive's eight                                              | 2 h                   | a desk saying what the names are                       |
 
 So **two to three days of work**, almost none of it deep: this module

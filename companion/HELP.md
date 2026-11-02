@@ -281,6 +281,20 @@ Scene recall, mutes and names work on a verified desk. Levels are held
 back until the bridge has measured that console's fader law, and the log
 says so in a sentence rather than failing quietly.
 
+A desk is "verified" the moment the MIDI Bridge says so, which can be a
+moment after you connect rather than at connect: on a Yamaha the bridge
+has to ask the desk which model it is first, and the Rivage PM5 and the
+DM7 Compact are verified separately. So a connection can say it drives a
+dLive only and then start driving the desk by itself a second later. You
+do not need to reconnect for that.
+
+**Scene lists.** A Yamaha DM7 keeps two lists of scenes, A and B. The
+**Scene list** box on a recall button names which one — leave it empty on
+every other console, and empty is also how you recall from a DM7's first
+list. Naming a list the desk hasn't got recalls **nothing** and says so
+in the log, rather than guessing at the other list: a recall of the wrong
+scene mid-show is the one mistake worth refusing a button for.
+
 ## Actions
 
 Mute · Fader (dB, ±dB, raw, all with optional timed fade) · Send level ·
