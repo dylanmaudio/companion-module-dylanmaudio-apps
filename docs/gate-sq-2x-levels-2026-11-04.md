@@ -101,10 +101,17 @@ hand. The rest addressed cells that show does not have and changed
 nothing. On a show with 8 groups and 6 matrices every one of those seven
 is a live send, a master move would move a send instead, and a cue setting
 a "master" to −∞ would silence a group in a matrix. Today's small show is
-not the general case. (Counts are RESEARCH's, over MIDI Bridge's TX rows
-14:12–15:13; counting the capture's `*.jsonl` alone gives 206 at `4F 00`
-and four fewer at each of `01`/`02`/`20`/`21`, the remainder being in the
-restore's own non-JSONL log.)
+not the general case.
+
+Two counts, reconciled with RESEARCH: **206** writes at `4F 00` for the
+play alone (14:14:05.355–14:18:38.052, countable in the capture's
+`*.jsonl`), and **210** with the rechecks and restores, which live only in
+MIDI Bridge's running log — one write each to `4F 00`, `01`, `02`, `11`,
+`20` and `21` at 14:19:18.75x and 14:19:20.49–.51 (inside the `cc/`
+rechecks, which end 14:19:24) and at 14:21:05.20x and 14:21:34.67–.70
+(the restores; monorepo #407 cites the 14:21:34 one). The same four-write
+difference appears at each of the other addresses, which is what makes the
+two figures agree.
 
 ## 4. The guard, and the two things that are ours
 
