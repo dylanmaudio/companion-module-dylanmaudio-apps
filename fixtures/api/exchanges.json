@@ -215,6 +215,25 @@
       "sends": [],
       "note": "#318: a recall by the number on screen before the SD's snapshot list is read (or in the 0.5 s after a snapshot is inserted or deleted at the desk) is 503 scene_unavailable: it clears by itself, so a client holds it and tries again; it is no lost link. A number no snapshot has, or two have, stays 400 desk_state."
     },
+    {
+      "id": "cmd.scene_name.mismatch",
+      "family": "digico", "codec": true, "model": "SD11",
+      "desk": [{"kind": "scene_name", "scene": 1, "number": 1.0, "name": "BASE"}, {"kind": "scene_count", "count": 1}],
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+        "body": {"lane_id": "<lane>", "cid": "fx-sd2", "intent": {"op": "scene", "scene_number": 1, "scene_name": "VERSE"}}},
+      "response": {"status": 400, "body": {
+        "ok": false, "error": {"code": "desk_state"}}},
+      "sends": [],
+      "note": "scenes.name_pin: a recall by number pinned to the name it had when the button was made. The scene at that number is named otherwise, so nothing is recalled, and the message names what it's called now. 400, not 503: it stands until the show changes back."
+    },
+    {
+      "id": "state.scene.current.digico",
+      "family": "digico", "codec": true, "model": "SD11",
+      "desk": [{"kind": "scene_name", "scene": 2, "number": 1.5, "name": "VERSE"}, {"kind": "scene_name", "scene": 1, "number": 1.0, "name": "BASE"}, {"kind": "scene_count", "count": 2}, {"kind": "scene", "scene": 2}],
+      "request": {"method": "GET", "path": "/api/v1/state"},
+      "response": {"status": 200, "body": {"state": {"scene.current": {"number": 2, "name": "VERSE", "scene_number": 1.5}}}},
+      "note": "scene.current carries what the desk's scene event carries: scene_number on a by_number desk, and scene_list (a field this desk doesn't have) on a desk with scenes.lists."
+    },
     {"id": "hello.digico.sd11", "family": "digico", "codec": true, "model": "SD11", "request": {"method": "POST", "path": "/api/v1/hello", "body": {"v": 1, "session": "main", "name": "Fixture SD Lane", "kind": "app", "consoles": ["digico"]}}, "response": {"status": 200, "body": {"lane_id": "<str>", "capabilities": {"fader_db": true}}}, "note": "Per-model verification (27 Oct): the SD11 is the model the SD driver was checked on, so fader_db holds."},
     {"id": "info.console.digico.desk_params", "family": "digico", "codec": true, "model": "SD11", "request": {"method": "GET", "path": "/api/v1/info"}, "response": {"status": 200, "body": {"console": {"model": "SD11", "verified_on_desk": true, "pan": {"types": ["input"], "step": null, "pushed": true}, "filters": {"hpf": {"types": ["input"], "freq_hz": [20, 20000]}}, "eq": {"types": ["input"], "pushed": true}}}}, "note": "#243: the block declares what each desk parameter takes, only as written and read on a desk; `model` is the desk's identity."},
     {"id": "cmd.pan.sd", "family": "digico", "codec": true, "model": "SD11", "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-sd2", "intent": {"op": "pan", "type": "input", "index": 8, "pan": -0.5}}}, "response": {"status": 200, "body": {"ok": true}}, "sends": ["2f 49 6e 70 75 74 5f 43 68 61 6e 6e 65 6c 73 2f 38 2f 50 61 6e 6e 65 72 2f 70 61 6e 00 00 00 00 2c 66 00 00 3e 80 00 00"], "note": "#243: pan −1…+1 (centre 0); the SD's wire is 0…1, so −0.5 is 0.25."},

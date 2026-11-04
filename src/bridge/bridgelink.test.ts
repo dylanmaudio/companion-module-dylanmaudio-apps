@@ -822,6 +822,15 @@ describe('BridgeLink', () => {
 			kind: 'scene',
 			scene: 2.5,
 		})
+		// An SD carries all three: the place in `number`, the screen's own
+		// decimal in `scene_number`, and the name. The place is what the
+		// mirror means, so `number` wins — 1.5 is what the desk SHOWS, not
+		// where it sits. Off the fixture, which landed 5 Nov (monorepo
+		// 8003fe93, on main).
+		const sd = fixture('state.scene.current.digico').response.body as { state: Record<string, unknown> }
+		const sdValue = sd.state['scene.current']
+		expect(sdValue).toEqual({ number: 2, name: 'VERSE', scene_number: 1.5 })
+		expect(deltaToEvent('scene.current', sdValue)).toEqual({ kind: 'scene', scene: 2 })
 		// And a desk that cannot list its scenes has no place to give: number
 		// is null and the screen number is in scene_number. Without the
 		// fallback this is #342 all over again, on a different desk.
@@ -829,10 +838,11 @@ describe('BridgeLink', () => {
 			kind: 'scene',
 			scene: 2.5,
 		})
-		// Both shapes are DEV: Yamaha driver's word as of 28 Oct and NOT yet in
-		// fixtures/api/exchanges.json — due 2 Nov. When it lands, this test
-		// should read the case out of the fixture the way the one above it
-		// does, and these literals should go.
+		// These two shapes are STILL literals, and still DEV: Yamaha driver's
+		// word (28 Oct): `number: null` appears in no case in
+		// fixtures/api/exchanges.json as of 8003fe93. The scene vocabulary
+		// that landed covers the SD above, which carries a place — so the
+		// fixture that was owed for the null is not the one that arrived.
 		expect(deltaToEvent('scene.current', { number: null, name: 'Verse' })).toBeUndefined()
 		// an SD's snapshot number is decimal, and dropping it would be the
 		// same silent loss this bug was

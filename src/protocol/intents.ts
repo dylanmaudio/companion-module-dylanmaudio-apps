@@ -28,6 +28,14 @@ export type Intent =
 	// It is bridge-only, like `scene_number`: no dLive byte carries it, and
 	// BridgeLink strips it on a console that declares no lists, because the
 	// bridge answers 400 `bad_intent` for a list on a desk that has none.
+	//
+	// A fourth key exists bridge-side and is NOT sent from here:
+	// `scene_name`, the name-pin (`scenes.name_pin`, exchanges
+	// `cmd.scene_name.mismatch`, monorepo 8003fe93 on main as of 5 Nov) —
+	// a recall by number pinned to the name the button was built with,
+	// refused 400 `desk_state` if the scene at that number is called
+	// something else now. It would be a new option on a shipped action,
+	// which is free to add but is the operator's call, so it waits.
 	| { op: 'scene'; scene: number; scene_number?: number; scene_list?: string }
 	| { op: 'cue_list'; id: number }
 	| { op: 'surface_cc'; cc: number; value: number }
