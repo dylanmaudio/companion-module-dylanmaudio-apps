@@ -619,12 +619,47 @@ it isn't established, and the Rivage and the DM7 are the next chance to
 see one.
 
 **Owed block change, and it is not a dB tolerance.** The scene step in all
-six blocks proves a recall with `fader_ch2` -> "0.0" (after ALLZERO) and
+six blocks proved a recall with `fader_ch2` -> "0.0" (after ALLZERO) and
 "-5.0" (after BASE). On a desk with no mirror update on recall and no Gets
 — the Avantis today — that variable is permanently blank, so the
 expectation is simply wrong there however loose the tolerance: the proof
 has to be `scene_current` alone, which did read 2 then 1. Add a dB
 tolerance only if the Rivage or the DM7 shows a stepped read-back.
+
+### 10e. That block change, done — and what the captures say about it
+
+Three things turned up while writing it, two of which make the proof
+stronger than a tolerance would have.
+
+**Who broadcasts what after a recall, from the captures and not from
+belief.** A DiGiCo re-broadcasts the channels the recall changed in the
+same burst as the scene event: the Quantum sent Inputs 2–8's faders and
+Input 8's mute 30 ms after "Scene recall applied" (12:55:40.732–.765,
+`pt2/mb-dlive-midi-1236-1257.jsonl`). An SQ does too, but not at once —
+after the recall at 14:35:39.539 the first mute came at **+0.54 s** and
+the first fader at **+2.99 s**, the rest about 20 ms apart
+(`masters/mb-dlive-midi-1435-1440.jsonl`, the SQ5+ CO run, which is clean;
+the `cc/` file is a Console Check play writing faders throughout and
+cannot be read for this). So a block that reads back 2 s after the press
+catches the SQ's mute and misses its fader, and the "failure" is the
+read's timing. The blocks now say the numbers. For the **dLive** — the
+shipped family — nothing in these notes records it either way, which was
+worth finding out: that block now asks for it rather than asserting it.
+
+**A recall that changes nothing broadcasts nothing.** The Quantum's
+second ALLZERO, pressed while the desk was already on that scene, sent
+scene events and not one fader (12:56:26). So pressing the same recall
+twice proves nothing the second time, and the blocks say so.
+
+**And `scene_current` means different things by family now, which is
+tonight's fix showing through.** On a desk that counts its scenes the
+module still applies the place it just sent, so the variable moves whether
+or not the desk did: it proves the press ran and reached the bridge, and
+the desk's own word is the scene event in the bridge's log. On a desk that
+numbers them there is no local apply any more (§10d), so the variable
+moves *only* on the desk's own event — it is the stronger proof there, of
+the two, which is the opposite of what the old wording assumed. Each block
+now says which kind its desk is.
 
 The page fix and this section landed together on 4 Nov, after RESEARCH
 released the hold on this repo (the desks were reset and packed by about
