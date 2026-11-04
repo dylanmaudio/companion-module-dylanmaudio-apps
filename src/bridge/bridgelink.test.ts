@@ -675,6 +675,33 @@ describe('BridgeLink', () => {
 		fresh.stop()
 	})
 
+	it('keeps what it learned across a reconnect, so a bridge restart cannot test the snapshot', async () => {
+		// Nothing clears the mirror in bridge mode: BridgeLink never calls
+		// ConsoleState.reset() (only the operator's Resync action and the test
+		// harness's ConsoleLink do), and refetchState() only APPLIES what the
+		// new snapshot carries. So a path the snapshot does not mention keeps
+		// the value the module already had.
+		//
+		// That is why a MIDI Bridge restart cannot prove #342's connect-time
+		// read — the module still remembers it — and why all six CO blocks ask
+		// for a connection toggle, which destroys the instance, instead. Both
+		// of the 4 Nov field runs took the restart (audit §10f).
+		//
+		// This pins the shipped behaviour, not a verdict: keeping the values,
+		// blanking them as ConsoleLink does, or marking them stale is an open
+		// choice. If it changes, this test should change with it.
+		link.start()
+		await waitFor(() => link.status === 'ok', 'ok')
+		bridge.pushEvent('scene', { number: 7 })
+		await waitFor(() => link.state.currentScene === 7, 'scene 7')
+
+		bridge.snapshot = {} // the restarted bridge's mirror starts empty
+		bridge.sseClose()
+		await waitFor(() => bridge.hellos.length > 1, 're-hello')
+		await waitFor(() => link.status === 'ok', 'ok again')
+		expect(link.state.currentScene).toBe(7)
+	})
+
 	it('leaves the current scene alone on a by_number recall instead of blanking it', async () => {
 		// The place is stripped on a by_number desk, so there is nothing to
 		// apply optimistically: 9.99 is not the ninth snapshot. This used to

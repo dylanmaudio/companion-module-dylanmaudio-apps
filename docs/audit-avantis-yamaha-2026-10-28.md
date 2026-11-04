@@ -724,3 +724,51 @@ what ruled it out, in about a minute, and the by-eye reading of §10b's
 own transcript — ALLZERO reporting `scene_current` 2, 9.99 reporting
 empty — is what pointed at the difference being an echo and not a status
 code.
+
+### 10f. #342's field check could not fail the way it says, and both runs took the weaker path
+
+Found 5 Nov, from ROADMAP's line that the RESULTS pages' "#342 rows stay
+as they are: they read the bridge's scene on connect". They don't
+necessarily.
+
+**In bridge mode the module never clears its state on a reconnect.**
+`ConsoleState.reset()` is called from exactly two places —
+`DliveInstance.resync()` (the operator's own Resync action) and
+`ConsoleLink.onDisconnect()`, which is the protocol test harness, not the
+shipping path. `BridgeLink` calls it nowhere. A dropped stream, a 409
+resync and a MIDI Bridge restart all go through `connectOnce()`, and
+`refetchState()` only *applies* what the new snapshot carries: a path the
+snapshot does not mention keeps whatever the module already had, and
+`apply()` returns no change where the value matches.
+
+So the two ways the blocks offered of "making the module reconnect" are
+not equivalent:
+
+- **Toggling the connection off and on** in Companion destroys the
+  instance and builds a new one. `state` is a field initialiser
+  (`new ConsoleState()`), so it starts empty and `scene_current` can only
+  have come from the snapshot. That tests #342.
+- **Restarting MIDI Bridge** leaves the module's instance alone. It still
+  remembers the 2 it had, so the read passes — and would pass against a
+  completely empty bridge mirror, which is the one thing #342 was about.
+
+**Both of the day's runs took the restart.** The Quantum's at 12:56:52 and
+the SQ5+'s at 14:35:39 each read `scene_current` 2 afterwards and were
+scored a pass. They are real evidence of something — the lane re-hellos,
+the connection recovers, no variable is destroyed by a reconnect — but
+not of the snapshot being read. The decode side is covered by unit tests
+off `state.scene.current.wing`; what the field runs were meant to add was
+the connect-time read, and that is the part still unproven on a desk.
+All six blocks now require the toggle and say why, and keep the restart as
+its own, weaker check.
+
+**The design question underneath, which is the operator's.** `ConsoleLink`
+blanks everything on a dropped socket; `BridgeLink` keeps it. Keeping it is
+kinder in a show — a brief reconnect doesn't empty every button — but it
+means that after a MIDI Bridge restart the module can show values the new
+mirror has never confirmed, which is the #342 class of fault wearing the
+operator's trust. Blanking instead would be honest and would also empty
+every strip on an Avantis for good, since that desk answers no Get and the
+cold sync cannot refill it. A third option is to keep the values and mark
+them: a `stale` flag after a reconnect until the cold sync completes. None
+of the three is free, and nothing is changed here pending that call.
