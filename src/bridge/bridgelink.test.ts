@@ -675,6 +675,72 @@ describe('BridgeLink', () => {
 		fresh.stop()
 	})
 
+	it('un-learns a mute and a fader the bridge says it no longer knows, instead of inventing one', async () => {
+		// Client API v1 §8: "A path that is absent or null is not known; a
+		// client shows it as such." On an Avantis EVERY recall — a lane's own
+		// included — nulls every mute, fader and send, as deltas with
+		// source: "bridge" ("A recall forgets"; the bridge's own
+		// test_a_recall_forgets_what_it_may_have_changed).
+		//
+		// Read as a value, `null` was one: `value === true` made a forgotten
+		// mute "not muted", and Number(null) is 0, so a forgotten fader became
+		// level 0 — which is −∞. After a recall on an Avantis every input
+		// would have read un-muted at −∞, stated as fact, on the one desk
+		// whose mirror has nothing else in it. Same root as #342's half of
+		// this, one layer down and worse.
+		link.start()
+		await waitFor(() => link.status === 'ok', 'ok')
+		bridge.pushEvent('delta', { path: 'input.4.mute', value: true })
+		bridge.pushEvent('delta', { path: 'input.4.fader', value: { lv: 101, db: -3.1 } })
+		await waitFor(() => link.state.strip({ type: 'input', index: 4 }).mute === true, 'mute learned')
+		await waitFor(() => link.state.strip({ type: 'input', index: 4 }).level === 101, 'fader learned')
+
+		changes = []
+		bridge.pushEvent('delta', { path: 'input.4.mute', value: null })
+		bridge.pushEvent('delta', { path: 'input.4.fader', value: null })
+		await waitFor(() => changes.flat().includes('fader/input/4'), 'both forgotten')
+		const s = link.state.strip({ type: 'input', index: 4 })
+		expect(s.mute).toBeUndefined() // not false
+		expect(s.level).toBeUndefined() // not 0, which reads as −∞
+		expect(s.db).toBeUndefined()
+		expect(changes.flat()).toContain('mute/input/4')
+
+		// and a second null changes nothing, so it costs no variable write
+		changes = []
+		bridge.pushEvent('delta', { path: 'input.4.mute', value: null })
+		bridge.pushEvent('delta', { path: 'input.9.mute', value: true })
+		await waitFor(() => link.state.strip({ type: 'input', index: 9 }).mute === true, 'the next delta')
+		expect(changes.flat()).not.toContain('mute/input/4')
+	})
+
+	it('reads a null in the cold snapshot as not-known too', async () => {
+		// The same rule at connect: the snapshot is the mirror, so an Avantis
+		// that has just recalled hands over nulls. This used to seed every
+		// one of them as un-muted at −∞ before the operator touched anything.
+		link.stop()
+		bridge.snapshot = {
+			'input.5.mute': null,
+			'input.5.fader': null,
+			'input.6.mute': true,
+			'input.6.fader': { lv: 90, db: -8.2 },
+		}
+		const fresh = new BridgeLink({
+			host: '127.0.0.1',
+			port: bridge.port,
+			laneName: 'av-nulls',
+			baseChannel: 1,
+			retryMs: 50,
+		})
+		fresh.start()
+		await waitFor(() => fresh.status === 'ok', 'ok')
+		expect(fresh.state.strip({ type: 'input', index: 5 }).mute).toBeUndefined()
+		expect(fresh.state.strip({ type: 'input', index: 5 }).level).toBeUndefined()
+		// and the ones it does know still land
+		expect(fresh.state.strip({ type: 'input', index: 6 }).mute).toBe(true)
+		expect(fresh.state.strip({ type: 'input', index: 6 }).level).toBe(90)
+		fresh.stop()
+	})
+
 	it('keeps what it learned across a reconnect, so a bridge restart cannot test the snapshot', async () => {
 		// Nothing clears the mirror in bridge mode: BridgeLink never calls
 		// ConsoleState.reset() (only the operator's Resync action and the test

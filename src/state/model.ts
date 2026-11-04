@@ -151,6 +151,30 @@ export class ConsoleState {
 		return this.strip({ type: 'input', index: input }).mixes.get(channelKey(dst))
 	}
 
+	/**
+	 * Un-learn one field, because the bridge said it is no longer known.
+	 *
+	 * Client API v1 §8: "A path that is absent or null is not known; a client
+	 * shows it as such", and on an Avantis every recall nulls every mute,
+	 * fader and send ("A recall forgets"), as deltas with `source: "bridge"`.
+	 * Without this the module kept what it last knew and showed it as fact
+	 * after the desk had been told to forget it.
+	 *
+	 * Returns the changed paths, or none where the field was already unknown.
+	 */
+	forget(ref: ChannelRef, field: 'mute' | 'fader'): string[] {
+		const s = this.strip(ref)
+		if (field === 'mute') {
+			if (s.mute === undefined) return []
+			s.mute = undefined
+			return [mutePath(ref)]
+		}
+		if (s.level === undefined && s.db === undefined) return []
+		s.level = undefined
+		s.db = undefined
+		return [faderPath(ref)]
+	}
+
 	/** Forget everything learned from the desk (keeps show-file scene names). */
 	reset(): string[] {
 		const changed: string[] = []

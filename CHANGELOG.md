@@ -10,6 +10,17 @@
   there saying "this module version drives a dLive only" for the whole
   session on a desk it was free to drive. The scene settings are re-read from
   the same block.
+- **A value the bridge says it no longer knows is no longer invented.** The
+  Client API sends `null` for a path it cannot answer, and on an Allen &
+  Heath Avantis every scene recall — including one pressed from Companion —
+  forgets every mute and level, because the desk sends the recall and none
+  of the values it changed. The module read that `null` as a value: a
+  forgotten mute became "not muted", and a forgotten fader became level 0,
+  which is −∞. So after a recall on that desk every input read un-muted at
+  −∞, stated as fact. It now un-learns the field instead, and the variable
+  goes blank, which is the honest answer and what the Client API asks a
+  client to show. On a dLive nothing changes: that mirror keeps the values
+  until something re-reads them.
 - **A recall that reports no place no longer puts the current scene at 0.**
   A scene event can carry `number: null` with the number on screen beside
   it, and `Number(null)` is 0, so the current scene went to 0; the module

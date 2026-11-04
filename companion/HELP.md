@@ -273,9 +273,17 @@ buttons are right the moment you connect. Not every console can: an
 Allen & Heath Avantis, for one, answers only for names and colours —
 there is no way for anybody to ask it a mute or a fader. On a desk like
 that, mute and level feedback is blank until that channel is touched for
-the first time, and then stays correct for the rest of the show. It is
-not a broken connection, and reconnecting will not fill it in; moving
-the fader will. `$(dlive:connected)` being true is the thing to check.
+the first time. It is not a broken connection, and reconnecting will not
+fill it in; moving the fader will. `$(dlive:connected)` being true is the
+thing to check.
+
+**And on that desk a scene recall empties them again.** An Avantis sends
+the recall and none of the values it changed — not even to whoever asked
+for it — so every mute and level goes back to not-known on every recall,
+including one pressed from Companion. Blank is the honest answer there
+and the module will not invent one: a blank fader after a recall is the
+desk having changed something nobody can read, not a fault. Touch the
+channel, or use **Resync**, to make it known again.
 
 Scene recall, mutes and names work on a verified desk. Levels are held
 back until the bridge has measured that console's fader law, and the log

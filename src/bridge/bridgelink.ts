@@ -779,6 +779,11 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 				this.consoleState = String(value)
 				continue
 			}
+			const gone = forgotten(path, value)
+			if (gone) {
+				for (const p of this.state.forget(gone.ref, gone.field)) changed.push(p)
+				continue
+			}
 			const ev = deltaToEvent(path, value)
 			if (!ev) continue
 			for (const p of this.state.apply(ev)) changed.push(p)
@@ -955,7 +960,14 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		switch (kind) {
 			case 'delta': {
 				this.stats.deltas++
-				const ev = deltaToEvent(typeof payload.path === 'string' ? payload.path : '', payload.value)
+				const path = typeof payload.path === 'string' ? payload.path : ''
+				const gone = forgotten(path, payload.value)
+				if (gone) {
+					const unlearned = this.state.forget(gone.ref, gone.field)
+					if (unlearned.length) this.emit('changed', unlearned)
+					return
+				}
+				const ev = deltaToEvent(path, payload.value)
 				if (!ev) return
 				this.emit('event', ev, 'mixrack')
 				const changed = this.state.apply(ev)
@@ -1060,6 +1072,26 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 // ---------------------------------------------------------------- mapping
 
 /** Bridge mirror path + value → the fixture-contract event our state applies. */
+/**
+ * The field a null delta un-learns, or undefined where a null means nothing
+ * to us. Client API v1 §8: "A path that is absent or null is not known; a
+ * client shows it as such." The Avantis nulls every mute, fader and send on
+ * every recall, a lane's own included ("A recall forgets").
+ *
+ * Sends are not here because nothing reads them in bridge mode anyway: their
+ * path has five segments and `deltaToEvent` takes three (audit §4 item 1).
+ * Names and colours are never nulled by that rule.
+ */
+export function forgotten(path: string, value: unknown): { ref: ChannelRef; field: 'mute' | 'fader' } | undefined {
+	if (value !== null) return undefined
+	const [type, idxStr, field] = path.split('.')
+	if (field !== 'mute' && field !== 'fader') return undefined
+	const index = Number(idxStr)
+	if (!isChannelType(type) || !Number.isInteger(index) || index < 1 || index > CHANNEL_TABLE[type].count)
+		return undefined
+	return { ref: { type, index }, field }
+}
+
 export function deltaToEvent(path: string, value: unknown): ConsoleEvent | undefined {
 	const parts = path.split('.')
 	if (path === 'scene.current') {
@@ -1098,6 +1130,12 @@ export function deltaToEvent(path: string, value: unknown): ConsoleEvent | undef
 	if (!isChannelType(type) || !Number.isInteger(index) || index < 1 || index > CHANNEL_TABLE[type].count)
 		return undefined
 	const ref: ChannelRef = { type, index }
+	// `null` is the bridge saying it does not know (spec §8), and it is not a
+	// value. Reading it as one turned a forgotten mute into "not muted" and a
+	// forgotten fader into level 0, which is −∞: on an Avantis, where every
+	// recall nulls every mute and fader, that was a page of buttons claiming
+	// silence. The caller un-learns the field instead (`forgotten()`).
+	if (value === null) return undefined
 	switch (field) {
 		case 'mute':
 			return { kind: 'mute', ...ref, on: value === true }

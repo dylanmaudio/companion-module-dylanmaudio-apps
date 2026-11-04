@@ -801,3 +801,59 @@ every strip on an Avantis for good, since that desk answers no Get and the
 cold sync cannot refill it. A third option is to keep the values and mark
 them: a `stale` flag after a reconnect until the cold sync completes. None
 of the three is free, and nothing is changed here pending that call.
+
+### 10g. A forgotten fader read as −∞, and a forgotten mute as un-muted
+
+MC's answer to ROADMAP (#421) distinguished two behaviours I had folded
+into one: on a **dLive** the mirror keeps the pre-recall values until
+something Gets them (by design until #420's re-read), while on an
+**Avantis** it does not keep them at all — every recall, a lane's own
+included, sets every mute, fader and send to **null**, as deltas with
+`source: "bridge"`. That is Client API v1 §8's "A recall forgets", and the
+bridge has its own test for it
+(`test_a_recall_forgets_what_it_may_have_changed`).
+
+The same section says what a client must do with that: "A path that is
+absent or **null is not known; a client shows it as such**." This module
+did the opposite, and I checked it against the built decoder rather than
+reasoning about it:
+
+```
+input.2.mute   null          -> {kind:"mute", on:false}
+input.2.fader  null          -> {kind:"fader", level:0}
+input.2.fader  {lv:null}     -> {kind:"fader", level:0}
+```
+
+`value === true` makes a forgotten mute "not muted", and **`Number(null)`
+is 0**, which as a dLive wire level is **−∞**. So after any recall on an
+Avantis every input would have read un-muted at −∞, stated as fact, on the
+one desk whose mirror holds nothing else. It is the same root as #342 —
+`Number(null)` being 0 — one layer down and worse: #342 made a scene
+number wrong, this makes a page of buttons claim silence.
+
+**Fixed.** `deltaToEvent` no longer takes a null for a value, and a new
+`forgotten(path, value)` tells the delta handler and the cold snapshot to
+un-learn the field instead, through `ConsoleState.forget()` — back to
+`undefined`, which is what every field here already means by "not known".
+Sends need nothing: their path has five segments and the decoder takes
+three, so a null send was already dropped (§4 item 1). Names and colours
+are never nulled by that rule. Two tests, both failing against the old
+code with `expected false to be undefined`.
+
+**Not observed on the day, and the day could not have shown it.** The
+Avantis CO row records `mute_ch8` staying false across the BASE recall and
+reads it as the module not seeing the change. Both readings produce
+`false` on the wire, because `mute_ch8` was never known on that run —
+`stripValues` renders an unknown mute as `false`. So this is confirmed
+against the spec and the decoder, not in the field.
+
+**Which leaves one thing that is the operator's, not mine.**
+`stripValues` publishes `mute_*` as `s.mute ?? false`: an unknown mute
+reads `false`, so even with the state now correct the variable still says
+"not muted". The stereo fields were given `''` for exactly this reason,
+with a note that `null` must never be flattened to false, and the same
+argument applies here — but `mute_*` is a shipped variable and a button
+comparing it to `false` would change behaviour on every family, so it is a
+compatibility call rather than a bug fix. The `mute` feedback is already
+right (`mute === true`, so unknown is not lit). Recommending `''`, as the
+stereo fields have.
