@@ -857,3 +857,46 @@ comparing it to `false` would change behaviour on every family, so it is a
 compatibility call rather than a bug fix. The `mute` feedback is already
 right (`mute === true`, so unknown is not lit). Recommending `''`, as the
 stereo fields have.
+
+#### 10g-i. Does the shipped 1.0.3 need this, and what would the patch be
+
+Checked, because ROADMAP first had it that the store version could not see
+an Avantis null and then that MIDI Bridge's `consoles` gate would stop it.
+Neither holds, and MC's answer agrees with what the code says:
+
+- **`v1.0.3` has no family gate at all.** Its `hello` sends
+  `{v, session, name, kind}` and no `consoles`; `CONSOLES` and
+  `foreignFamily` came later. So it does not refuse a foreign desk — it
+  reads one as a dLive.
+- **The bridge's gate is on writes only.** `hello` accepts a lane with no
+  `consoles` on any family and records it as `["dlive"]`
+  (`dlive_client_api.py:1023`); `_refuse_other_family` returns None for
+  every read op and says so in its own docstring: "Reads stay open to
+  every lane". The stream needs only a lane id. So `v1.0.3` on an Avantis
+  would get the state, the stream and the nulls.
+- **The decoder is identical there.** `v1.0.3`'s `deltaToEvent` has the
+  same `on: value === true` and the same `Number(value)` fader path, so a
+  null is `false` and level 0 in exactly the same way.
+- **What keeps it harmless today is timing, not design.** No shipped MIDI
+  Bridge drives an Avantis: 1.4.5 is the store's and 1.5.0-beta.1 did not
+  include it, so the first build that can is 1.5.0-beta.2 from main.
+
+So the exposure starts with a MIDI Bridge release, which is the same
+person's to schedule — the two products only need releasing in the right
+order.
+
+**The patch, if it is wanted, is one line.** On a `release/1.0.x` off
+`v1.0.3`: `if (value === null) return undefined` before the field switch in
+`deltaToEvent`. No id, option or variable changes, so no upgrade script and
+nothing for `src/upgrades.ts`. It stops the invention and leaves the last
+known value, which is the dLive's own behaviour and what that build already
+does on every other desk; it does NOT bring `forget()` back to 1.0.x, so a
+1.0.3 user on an Avantis would read a stale value rather than a blank one.
+Stale is wrong-but-plausible where −∞ is wrong-and-alarming, and the
+smaller change is the right one for a patch to a shipped build.
+
+The alternative, MIDI Bridge refusing reads to a lane that declares no
+`consoles`, is worse and not just for this module: it would blank every
+pre-1.4.93 client on every non-dLive desk, including the other apps, and
+it punishes a client that is reading exactly as the API told it to. Fixing
+the client that mis-reads is the narrower and more honest repair.
