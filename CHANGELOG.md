@@ -10,10 +10,15 @@
   there saying "this module version drives a dLive only" for the whole
   session on a desk it was free to drive. The scene settings are re-read from
   the same block.
-- **The current scene survives a recall on a desk that numbers its scenes
-  and has no list of places** (a Yamaha). The desk announces the recall with
-  no place and the number on screen beside it; the module read the place,
-  and so put the current scene at 0 on every recall. Same cause as the
+- **A recall that reports no place no longer puts the current scene at 0.**
+  A scene event can carry `number: null` with the number on screen beside
+  it, and `Number(null)` is 0, so the current scene went to 0; the module
+  now reads the screen number instead. Written for a Yamaha on the driver
+  thread's word of 28 Oct, which that thread withdrew on 5 Nov: every
+  Yamaha recall reports its place, and the two families whose own recall
+  the bridge announces at send (the Wing, the Avantis) count their scenes
+  and so fill the place in. So this is a guard against a 0 that no shipped
+  desk produces today, not a fix an operator will see. Same cause as the
   snapshot fix above it in this list, in the live stream rather than at
   connect.
 - **And the current scene no longer blanks on a recall by number** (a

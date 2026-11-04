@@ -838,11 +838,18 @@ describe('BridgeLink', () => {
 			kind: 'scene',
 			scene: 2.5,
 		})
-		// These two shapes are STILL literals, and still DEV: Yamaha driver's
-		// word (28 Oct): `number: null` appears in no case in
-		// fixtures/api/exchanges.json as of 8003fe93. The scene vocabulary
-		// that landed covers the SD above, which carries a place — so the
-		// fixture that was owed for the null is not the one that arrived.
+		// These two shapes stay literals, and there will be no fixture for
+		// them: DEV: Yamaha driver withdrew its 28 Oct word on 5 Nov, having
+		// checked main (05db32a9) against a Virtual DM7 and a Virtual Rivage.
+		// Verified here in the monorepo's own code rather than taken: the
+		// Yamaha codec's scene_report_is_recall is True and it does not
+		// override recall_told_to_writer, so `_recall_unreported()` is False
+		// for it and the Client API's at-send event never fires there. The two
+		// families it does fire for — the Wing, and the Avantis, which tells a
+		// writer none of its own changes — both COUNT their scenes, so
+		// `number` is filled in. No shipped path sends the null today. The
+		// guard stays all the same, because Number(null) is 0 and a current
+		// scene of 0 is a wrong answer, not a missing one.
 		expect(deltaToEvent('scene.current', { number: null, name: 'Verse' })).toBeUndefined()
 		// an SD's snapshot number is decimal, and dropping it would be the
 		// same silent loss this bug was
