@@ -103,6 +103,14 @@ otherwise on the day.
 
 Adding ids is additive and breaks nobody (CLAUDE.md).
 
+**But declaring `sq` is what holds this branch unreleased**, as of 4 Nov:
+on an SQ+ on firmware 2.x the desk's master faders are not where the
+bridge writes them, so a shipped "Main level" preset would move a
+Group → Matrix send. See
+[gate-sq-2x-levels-2026-11-04.md](gate-sq-2x-levels-2026-11-04.md) —
+the evidence, the grades, and the two module-side items that have to be
+decided before the gate comes off.
+
 ## 3. Levels
 
 |           | Avantis                                                       | Yamaha RCP                                                                      |
@@ -531,3 +539,98 @@ same `mute` feedback on input 9, so both lit red whenever ch 9 was muted.
 The feedback is now on 'MUTE on' only. Not re-imported on the day: it is
 a look, the read-backs are the evidence, and a mid-day import costs the
 operator time for nothing.
+
+### 10c. The fader buttons never reached the module — and §10b item 1 was wrong about the cause
+
+Companion's own log for the dylanmaudio connection, on every fader press
+of the day — the Quantum at 12:55:30, 12:55:32, 12:55:38, 12:56:09,
+12:56:11, 12:56:13, and the Avantis at 13:31:16, 13:31:18, 13:31:20 and
+again after a bridge restart at 13:32:2x:
+
+    warn Failed to parse action options for action fader:
+         {"fade":"A value must be provided"}
+    warn Error executing action: Error: Failed to parse action options.
+         One or more options were invalid
+         Action: Fader: set level (dB) - Location: Button 2/0/0
+
+So the action never ran and the module never saw the press. **§10b item 1
+is wrong about the cause**: the Quantum's `capabilities.fader_db` was
+indeed false and `fadeTo` would have refused the level, but nothing got
+that far, and the Companion log line I predicted ("Levels aren't sent to
+a …") is nowhere in today's log, which is the evidence that the gate was
+never reached. The rule in §10b still holds for the next desk and the
+blocks still need the flag read — it just did not cause this.
+
+**The bug is mine, in `blocks/shop-check.companionconfig`:** the three
+fader buttons carried `{type, index, db}` and no `fade`. The `fader`
+action declares four options (`channelFields` → type, index; `DB_FIELD`
+→ db; `FADE_FIELD` → fade), and **Companion 5.1 rejects a control whose
+options are missing a declared key even when that field has a default**
+— `FADE_FIELD` is `{type: 'number', id: 'fade', default: 0}`. A button
+built in Companion's UI always writes every key; a hand-authored one
+must too. `mute` (type/index/mode) and `scene_recall`
+(scene/scene_number/scene_list) were complete, which is why they worked
+all day. **Checked for the whole page, not just the three buttons.**
+
+Consequences for the record: the fader rows on the Quantum and the
+Avantis are **not exercised** — not an expected refusal, not a module
+fail — and a re-import of the page is needed before any fader row means
+anything. The dB write on any A&H or DiGiCo desk therefore still rests
+on the SD11 run of 27 Oct.
+
+Two lines of the day that did land, from the same log:
+`Bridge rejected scene: desk_state (no snapshot on the console is
+numbered 9.99)` (12:55:43.762 and 12:56:15.690) — the refusal §10b item
+3 predicted, in the module's own words.
+
+And `scene_current` going blank (§10b item 4) is still unexplained: the
+log shows the dylanmaudio instance starting only at 00:22 and 13:18, no
+reload and no resync in the Quantum's window, and no path writes
+`undefined` except `state.reset()`.
+
+**Re-run, and what it settled.** The operator imported the fixed page at
+13:41:22 (`ImportExport/Controller Import: Parsing 2564 bytes` — the
+patched file's exact size) and all three fader rows were re-run before
+the SQ5+: the Avantis at 13:41:55-13:42:00 (the operator's presses, so no
+HttpApi lines), the Quantum at 13:43:06/08/10 and the SQ5+ at 14:34:35/38/44
+(RESEARCH's presses over Companion's HTTP API). **No warn line of any kind
+from the dylanmaudio connection in any of the three windows** — no parse
+failure, no `Bridge rejected`, no dB-law refusal. So the fader row is
+exercised on three desks, the page fix is proved on a desk, and the `fade`
+option was the whole of it.
+
+**And a finding for the next block, from the Avantis's TX — a WRITE-side
+one, not a read-back.** That desk did not land on the number the button
+asked for: `Input channel 9 fader -0.1 dB (wire 107)` for the 0 dB button,
+`-20.2 dB (wire 67)` for the -20 one (RESEARCH's reading of MIDI Bridge's
+log, 4 Nov — the bridge's own description of what it sent, so `single`,
+and about the bridge's law table, not this module). The DiGiCo is the
+opposite case in the same run: dB on the wire, so -20.0 / +0.0 / -inf went
+out and came back exactly.
+
+**What the read path actually showed, which is not stepping:** on the
+Avantis `fader_ch2` read **blank** after both recalls and `mute_ch8` stayed
+false, because that desk reports nothing a recall changes and answers no
+Gets (audit section 7; RESEARCH, 4 Nov). On the SQ5+ `fader_ch2` was not
+read at all. On the Quantum it read "0.0" and "-5.0" exactly. **So there is
+no evidence that an A&H dB READ-BACK is quantised — only that the write
+is.** An earlier draft of this section claimed the read-back was a step;
+it isn't established, and the Rivage and the DM7 are the next chance to
+see one.
+
+**Owed block change, and it is not a dB tolerance.** The scene step in all
+six blocks proves a recall with `fader_ch2` -> "0.0" (after ALLZERO) and
+"-5.0" (after BASE). On a desk with no mirror update on recall and no Gets
+— the Avantis today — that variable is permanently blank, so the
+expectation is simply wrong there however loose the tolerance: the proof
+has to be `scene_current` alone, which did read 2 then 1. Add a dB
+tolerance only if the Rivage or the DM7 shows a stepped read-back.
+
+The page fix and this section landed together on 4 Nov, after RESEARCH
+released the hold on this repo (the desks were reset and packed by about
+17:50). Two of my own commits had reloaded the module in the operator's
+live Companion earlier in the day — `Instance/Modules Attempting to
+reload module in: …/companion-dev-modules/dylanmaudio`, 13:18:23 and
+13:18:39 — because Companion watches the whole repo through the
+dev-module symlink. Re-importing the fixed page is the operator's, not
+mine.
