@@ -2,7 +2,7 @@
  "schema": "session-protocol/1",
  "family": "dlive",
  "title": "Companion on the shop's dLive (DM0 + C3500, 2.12): the re-check rows",
- "version": "2026-11-03 draft 1 (Dev: Bitfocus Companion module, for RESEARCH's 4 Nov sheets; the module at topic/avantis-yamaha 69635f4 or later)",
+ "version": "2026-11-03 draft 1 (Dev: Bitfocus Companion module, for RESEARCH's 4 Nov sheets; the module at topic/avantis-yamaha 69635f4 or later) + 4 Nov revision (the Quantum's CO: the fader_db gate, and the refusal lines are in Companion's log)",
  "sources": [
   "docs/shop-day-2026-11-04-plan.md (topic/session-days 43099249)",
   "docs/prepared-show-spec-2026-11.md (the answer key: names, the baseline, the scenes)",
@@ -22,7 +22,7 @@
    "steps": [
     {
      "do": "note",
-     "prompt": "Page 11 'Shop check' must be imported into Companion ONCE before the first desk (not per desk): Companion -> Buttons -> Import, choose blocks/shop-check.companionconfig from the module repo, and put it on page 11. It carries 14 buttons: row 0 SAFE9's fader and mute, row 1 scenes by place, row 2 scenes by number (including list B and a list the desk hasn't got). It references the existing dylanmaudio connection by id, so the import should map it with nothing to choose. If page 11 is taken, import it anywhere and change the page number in every curl below."
+     "prompt": "Page 11 'Shop check' must be imported into Companion ONCE before the first desk (not per desk): Companion -> Buttons -> Import, choose blocks/shop-check.companionconfig from the module repo, and put it on page 11. It carries 14 buttons: row 0 SAFE9's fader and mute, row 1 scenes by place, row 2 scenes by number (including list B and a list the desk hasn't got). It references the existing dylanmaudio connection by id, so the import should map it with nothing to choose. If page 11 is taken, import it anywhere and change the page number in every curl below. Row 0's 'MUTE off' button carries NO feedback: until 4 Nov it carried the same mute feedback as 'MUTE on', so both lit red whenever ch 9 was muted (seen on the Quantum). A page imported before that fix shows the old look -- cosmetic, and it must not fail the mute ask, which is about 'MUTE on'."
     },
     {
      "do": "manual",
@@ -42,7 +42,7 @@
     },
     {
      "do": "manual",
-     "text": "CLAUDE, the writes, over HTTP. SAFE9 (Input 9) has no source and no output patched and every main assign is off, so none of this reaches audio. In order, 2 s apart: curl -s -X POST http://127.0.0.1:8888/api/location/11/0/0/press (SAFE9 -20 dB); curl -s -X POST http://127.0.0.1:8888/api/location/11/0/1/press (0 dB); curl -s -X POST http://127.0.0.1:8888/api/location/11/0/3/press (MUTE on); curl -s -X POST http://127.0.0.1:8888/api/location/11/0/4/press (MUTE off); curl -s -X POST http://127.0.0.1:8888/api/location/11/0/2/press (-inf, SAFE9 as found). After each, read it back: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch9/value and curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/mute_ch9/value. Then the scene, by PLACE: curl -s -X POST http://127.0.0.1:8888/api/location/11/1/1/press (place 2, ALLZERO). ALLZERO moves seven faders and unmutes Input 8, so the proof is in the variables: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch2/value → \"0.0\" (was -5.0) and curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/mute_ch8/value → false. The press endpoint is POST and answers 204 whether or not a button is there (checked against this Mac's Companion, 3 Nov: POST /api/location/99/9/9/press → 204, GET → 404), so a 204 proves NOTHING. The proof of every press is the variable read-back above and MIDI Bridge's log."
+     "text": "CLAUDE, the writes, over HTTP. SAFE9 (Input 9) has no source and no output patched and every main assign is off, so none of this reaches audio. In order, 2 s apart: curl -s -X POST http://127.0.0.1:8888/api/location/11/0/0/press (SAFE9 -20 dB); curl -s -X POST http://127.0.0.1:8888/api/location/11/0/1/press (0 dB); curl -s -X POST http://127.0.0.1:8888/api/location/11/0/3/press (MUTE on); curl -s -X POST http://127.0.0.1:8888/api/location/11/0/4/press (MUTE off); curl -s -X POST http://127.0.0.1:8888/api/location/11/0/2/press (-inf, SAFE9 as found). After each, read it back: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch9/value and curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/mute_ch9/value. No fader_db gate here: the dLive is not a foreign family, so the module converts dB to a dLive lv itself and the three fader presses MUST land. A refusal is a real fail -- the Quantum's expected refusal on 4 Nov came from capabilities.fader_db false, which cannot arise on the dLive. Then the scene, by PLACE: curl -s -X POST http://127.0.0.1:8888/api/location/11/1/1/press (place 2, ALLZERO). ALLZERO moves seven faders and unmutes Input 8, so the proof is in the variables: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch2/value → \"0.0\" (was -5.0) and curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/mute_ch8/value → false. The press endpoint is POST and answers 204 whether or not a button is there (checked against this Mac's Companion, 3 Nov: POST /api/location/99/9/9/press → 204, GET → 404), so a 204 proves NOTHING. The proof of every press is the variable read-back above and MIDI Bridge's log."
     },
     {
      "do": "manual",
@@ -72,7 +72,7 @@
     },
     {
      "do": "note",
-     "prompt": "CO: the module's SHA; every variable read above with its value; the connection status string word for word; MIDI Bridge's log over the block (each write, each echo, each scene event with its number and name, and the 400 for 9.99); and Companion's own log for the dylanmaudio connection over the block (Settings -> Log, or ~/Library/Logs/companion). Anything the operator said."
+     "prompt": "CO: the module's SHA; every variable read above with its value; the connection status string word for word; MIDI Bridge's log over the block (each write, each echo, each scene event with its number and name, and the refusal of 9.99 -- which is in COMPANION's log, not the bridge's: the bridge refuses a number not in the list before it touches the desk, so there is no TX, and the module's line reads \"Bridge rejected scene: desk_state (...)\" (or scene_unavailable if the snapshot list is still being read). Grep Companion's log for \"Bridge rejected\"); and Companion's own log for the dylanmaudio connection over the block (Settings -> Log, or ~/Library/Logs/companion). Anything the operator said."
     }
    ]
   }

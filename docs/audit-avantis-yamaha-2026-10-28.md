@@ -455,3 +455,79 @@ desk on the same driver — the module deliberately does not retry that
 503, because a scene recall arriving late is its own hazard (CODE
 `postCmd`). If a Quantum raises it more often than an SD11 does, that
 decision is worth revisiting with the capture in hand.
+
+### 10b. What the Quantum's CO actually did, 4 Nov — and what it did not
+
+RESEARCH ran the Quantum's CO block on the shop's SD7Q-Q1 (module
+bcc48ea, run from source; the Shop check page imported on page 2, not
+11). It reported `verified_on_desk: true`, `scenes.by_number: true`, the
+connection ok, the cold state as the answer key has it (ZEBRA1,
+NARWHAL8, 0.0, −20.0, muted ch 8, scene 1), `width_ch11` stereo with
+`linked`/`partner` empty, the scene recall by number landing (2.00 →
+Snapshot 2, `fader_ch2` 0.0, `mute_ch8` false, `scene_current` 2), and
+#342 holding across a bridge restart. Four things to record, none of
+which changed `src/`:
+
+1. **SAFE9's three fader buttons sent nothing, and that is the designed
+   chain, not a bug.** `fader` → `fadeTo(ref, {db}, 0)` → on a foreign
+   family, `if (this.caps.fader_db === false)` logs once and returns
+   before anything is posted (CODE `bridgelink.ts`). The desk reported
+   `capabilities.fader_db: false`. The bridge's rule for that flag:
+   `caps["fader_db"] = fader_db_verified and self._model_verified() is
+   not False`, documented as "fader_db only where the family's dB writes
+   are verified on a desk … and, where the family lists its verified
+   models, on one of them" (`_capabilities`, read in the monorepo
+   worktree `dreamy-bose-42e71b`, 4 Nov). The DiGiCo codec's
+   `fader_db_verified` is `True` unconditionally and its
+   `verified_models` is `frozenset({"SD11"})` in that copy, so a
+   Q112 withholds the flag. **Two claims from the same bridge build
+   disagree in a way worth a rig ticket**: the console block said
+   `verified_on_desk: true` for this model while `fader_db` was withheld
+   for it. Precedent for the working case: the SD11 run of 27 Oct took
+   +10, 0, −20 and −∞ with echoes in 20–30 ms — on MIDI Bridge
+   `1a5e8c55`, branch `topic/digico-fader-db`, i.e. a build where the
+   flag was true (`docs/status/console-checklist.md`, Faders row). Same
+   module path, different bridge build. **Grade: two-impl → hardware for
+   the refusal; the dB write itself is still `hardware` only on an
+   SD11.**
+2. **Open, and ours: the operator sees nothing.** The refusal's only
+   trace is one `info` line in Companion's log, once per session. A
+   button that silently does nothing is the look RESEARCH reported
+   ("sends nothing"), and they went to MIDI Bridge's log for it, where by
+   construction there is nothing. Worth considering after the desks: a
+   warn rather than an info, and whether a refused level should leave a
+   mark a preset can read. Not changed on a desk day.
+3. **The 9.99 refusal is in Companion's log, not the bridge's.** The
+   DiGiCo codec's `write_refusal` refuses a number not in the list
+   before the desk is touched, so no TX is correct, and `_desk_nack`
+   answers 400 `desk_state` (or 503 `scene_unavailable` while the list is
+   unread). The module logs `Bridge rejected scene: desk_state (…)` at
+   warn and does not retry. The CO blocks' record note asked for "the
+   400 for 9.99" from the bridge's log — wrong place, corrected in all
+   six blocks.
+4. **`scene_current` going blank after that refused recall is
+   unexplained, and nothing on the refusal path can do it.** A refused
+   post changes no state; a `scene.current` delta of `null` is dropped
+   (`deltaToEvent` returns `undefined`, leaving the value alone); a
+   `scene` event with no usable number returns early. The only writer of
+   `undefined` is `state.reset()`, which runs on a resync or a fresh
+   instance — so the likely cause is a reconnect or resync in that
+   window, after which the variable stays blank until the first recall
+   because the bridge's `scene.current` reads null (#270, the cold-sync
+   blank). Settled by Companion's log for that window; asked for.
+
+Also reported and **not** a module matter: the first presses after the
+bridge's 12:26 restart drew MIDI Bridge's "command refused, unknown or
+expired lane … (client should re-hello)". `postCmd` already re-hellos and
+resends the same envelope once on exactly `401` + `error.code ==
+"unknown_lane"`, and the bridge's `cmd` returns exactly that pair
+(`401, _nack(cid, "unknown_lane", …)`). So that warning is the first half
+of a successful recovery; a press is only lost if Companion's log also
+carries `"<op> didn't reach MIDI Bridge"` or `Bridge rejected`.
+
+And one of mine, in the page rather than the module:
+`blocks/shop-check.companionconfig` gave 'MUTE on' and 'MUTE off' the
+same `mute` feedback on input 9, so both lit red whenever ch 9 was muted.
+The feedback is now on 'MUTE on' only. Not re-imported on the day: it is
+a look, the read-backs are the evidence, and a mid-day import costs the
+operator time for nothing.
