@@ -39,7 +39,9 @@ FX-return faders; input→aux and input→FX sends; scenes.
 
 Three independent legs, all from the shop's SQ5+ on firmware 2.0.2,
 4 Nov (`sim/captures/2026-11-04-sq-signoff-sq/masters/` in the monorepo,
-rig `3cca09c2`):
+rig `3cca09c2`; the day's signed-off write-up is `RESULTS.md` beside it,
+rig `aa1a460f`, and its own checklist row leaves this module's master
+buttons untested and this repo to decide):
 
 1. **The desk broadcasts its masters at the 2.0.3 addresses.** When the
    operator moved them at the surface from 14:38:55: `4F 54` ×149,
