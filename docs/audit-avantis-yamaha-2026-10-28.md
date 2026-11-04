@@ -752,15 +752,44 @@ not equivalent:
   remembers the 2 it had, so the read passes — and would pass against a
   completely empty bridge mirror, which is the one thing #342 was about.
 
-**Both of the day's runs took the restart.** The Quantum's at 12:56:52 and
-the SQ5+'s at 14:35:39 each read `scene_current` 2 afterwards and were
-scored a pass. They are real evidence of something — the lane re-hellos,
-the connection recovers, no variable is destroyed by a reconnect — but
-not of the snapshot being read. The decode side is covered by unit tests
-off `state.scene.current.wing`; what the field runs were meant to add was
-the connect-time read, and that is the part still unproven on a desk.
-All six blocks now require the toggle and say why, and keep the restart as
-its own, weaker check.
+**Four of the day's five runs took the restart** — the Avantis at
+13:32:24, the Quantum at 12:56:52, the SQ5+ at 14:35:39 and the Rivage at
+15:15:10 — and the DM7 never ran #342 at all. Each restart read
+`scene_current` back correctly afterwards and was scored a pass. They are
+real evidence of something — the lane re-hellos, the connection recovers,
+no variable is destroyed by a reconnect — but not of the snapshot being
+read. All six blocks now require the toggle and say why, and keep the
+restart as its own, weaker check.
+
+**The dLive did toggle, and that one does show it — the other way up than
+expected.** At 16:34:46 the operator toggled the connection; the fresh
+instance read `scene_current` **3**, which is the bridge's cold snapshot,
+while the desk was on Scene 2
+(`sim/captures/2026-11-04-dlive-signoff-dlive/RESULTS.md`, and the same
+note in `capture.jsonl`'s CO.8). So the connect-time read is shown: a
+fresh instance cannot have remembered 3, and it was neither blank nor 1,
+which is exactly what #342 was. The value being wrong is the bridge's
+`scene.current` going stale after an app's own recall — **#413**, filed
+against MIDI Bridge, and the console checklist already carries it as such
+on the Companion row.
+
+**What that does to the design question below.** Before the toggle the
+module's own `scene_current` read 2, which was right, because on a
+counting desk it applies the place it sent. After the toggle it read the
+mirror's 3, which was wrong. So the reconnect took the operator's display
+from right to wrong, and the dangerous read there was the **fresh** one,
+not the remembered one — the opposite of the risk I had written down.
+Keeping state is not simply the softer, less honest option; on this desk
+it was the accurate one. A `stale` mark would have been better than either,
+and that is now the option I would argue for.
+
+**And it answers the dLive question §10e left open.** `fader_ch2` read −∞
+three seconds after the place-2 recall — the pre-recall value — and became
++9.9 only after the reconnect's cold sync. A dLive tells its sender
+nothing of its own write, so the recall's values reach no mirror until
+something asks again. Both the dLive and the Avantis blocks now say to
+expect stale rather than right, the Avantis on its codec's own claim to
+the same behaviour (`recall_told_to_writer` False, A5 and A6 on 2 Nov).
 
 **The design question underneath, which is the operator's.** `ConsoleLink`
 blanks everything on a dropped socket; `BridgeLink` keeps it. Keeping it is
