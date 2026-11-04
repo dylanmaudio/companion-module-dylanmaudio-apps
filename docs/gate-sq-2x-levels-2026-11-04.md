@@ -95,23 +95,37 @@ family and not merely its level writes.
 
 **How much harm a write does depends on the show.** On the shop's
 4-group, 3-matrix show only two of the seven addresses written on the day
-were live sends — `4F 00` (Grp3 → Mtx3), which took 210 writes from
-Console Check's play and restore *as "LR"*, and `4F 04`, one write by
-hand. The rest addressed cells that show does not have and changed
-nothing. On a show with 8 groups and 6 matrices every one of those seven
+were live sends — `4F 00` (Grp3 → Mtx3), which took 210 writes *as "LR"*
+from the normal tooling, and `4F 04`, one write by hand. The rest
+addressed cells that show does not have and changed nothing. On a show with 8 groups and 6 matrices every one of those seven
 is a live send, a master move would move a send instead, and a cue setting
 a "master" to −∞ would silence a group in a matrix. Today's small show is
 not the general case.
 
-Two counts, reconciled with RESEARCH: **206** writes at `4F 00` for the
-play alone (14:14:05.355–14:18:38.052, countable in the capture's
-`*.jsonl`), and **210** with the rechecks and restores, which live only in
-MIDI Bridge's running log — one write each to `4F 00`, `01`, `02`, `11`,
-`20` and `21` at 14:19:18.75x and 14:19:20.49–.51 (inside the `cc/`
-rechecks, which end 14:19:24) and at 14:21:05.20x and 14:21:34.67–.70
-(the restores; monorepo #407 cites the 14:21:34 one). The same four-write
-difference appears at each of the other addresses, which is what makes the
-two figures agree.
+**That tooling is two tools, not one**, and the counts say so. Writes at
+`4F 00`, counted here from the capture's own `*.jsonl` (NRPN `06`, Gets
+excluded):
+
+| Span | Writes at `4F 00` | What ran |
+|---|---|---|
+| 14:14:05.355–14:15:53.357 | 102 | MIDI Bridge's own `console_check --play` |
+| 14:16:45.663–14:18:38.052 | 104 | Console Control's Console Check play |
+| 14:19:18.75x, 14:19:20.49–.51 | 2 | the `cc/` rechecks (they end 14:19:24) |
+| 14:21:05.20x, 14:21:34.67–.70 | 2 | the restores (monorepo #407 cites the 14:21:34 one) |
+
+So **206** for the two plays — the figure I counted first, its span being
+exactly the first write to the last — and **210** with the rechecks and
+restores, which live only in MIDI Bridge's running log. The same
+four-write difference appears at each of the other addresses, which is
+what makes the two figures agree: `4F 01` and `02` went 64 + 66 + 2 + 2,
+`4F 20` and `21` 64 + 67 + 2 + 2, `4F 11` 1 + 2 + 2 + 2 and the by-eye
+write. RESEARCH reconciled the split (masters `README.md` §5, rig
+`eb107553`); the rows above are counted here, from the same files.
+
+Which matters for what the day shows: not that someone probed an address
+by hand, but that the normal tooling — the bridge's own acceptance check
+and Console Control's — wrote to a live Group → Matrix send a few hundred
+times while calling it LR.
 
 ## 4. The guard, and the two things that are ours
 
