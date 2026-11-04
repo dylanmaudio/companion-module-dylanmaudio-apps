@@ -634,3 +634,58 @@ reload module in: …/companion-dev-modules/dylanmaudio`, 13:18:23 and
 13:18:39 — because Companion watches the whole repo through the
 dev-module symlink. Re-importing the fixed page is the operator's, not
 mine.
+
+### 10d. `scene_current` went blank after the refused 9.99 — and it was never the refusal
+
+RESEARCH left this open for me on the Quantum's RESULTS page (rig
+`3032bf05`): MIDI Bridge refused snapshot 9.99 with
+"desk_state (no snapshot on the console is numbered 9.99)" at 12:55:43.762
+and 12:56:15.690, which is right, and `scene_current` then read empty
+until the next recall.
+
+**The refusal has nothing to do with it.** I went looking for a path from
+a 400 to the variable and there is none: `postCmd` counts the failure and
+logs it (`src/bridge/bridgelink.ts:576`), nothing more, and the bridge's
+own log for the span shows the press never left the bridge — the desk sent
+no scene traffic at all between 12:55:40.765 ("Scene recall applied", the
+2.00 that worked) and 12:56:25
+(`pt2/mb-dlive-midi-1236-1257.jsonl`). `scene_current` is only ever
+`state.currentScene ?? ''` (`src/variables.ts:138`), so something had set
+`currentScene` to undefined.
+
+**It was the optimistic apply, on every by_number recall.** `send()`
+applies the event its own intent implies so a feedback lights on the press
+(`localEvent`, `src/protocol/localevent.ts`). On a desk that numbers its
+scenes, `sceneForConsole()` has already removed `scene` and left only
+`scene_number` — deliberately, §4 — so `intent.scene` is `undefined` by
+then, and the cast that builds that intent hides it from the compiler.
+`localEvent` returned `{kind: 'scene', scene: undefined}`, and
+`ConsoleState.apply` duly set `currentScene = undefined` and reported
+`scene` as changed.
+
+So the blank was not the refusal's doing and not special to 9.99: **every**
+recall on the Quantum blanked the variable for as long as it took the
+desk's echo to arrive. 2.00 blanked it too, at 12:55:3x, and the desk
+answered 9 ms later ("Scene 2 is current", 12:55:40.732) before anything
+read it. 9.99 was the case where no echo was ever coming, so the blank
+stood — and the second press at 12:56:09 changed nothing, because
+`undefined === undefined` is not a change.
+
+**Fixed:** `localEvent` applies a scene only where a place is actually
+known, which is a desk that counts its scenes. A number is not a place —
+9.99 is not the ninth snapshot — so on a by_number desk the variable now
+waits for the desk's own word and a refused recall leaves it reading what
+the desk last said. Covered by "leaves the current scene alone on a
+by_number recall instead of blanking it"
+(`src/bridge/bridgelink.test.ts`), which fails against the old code with
+`expected undefined to be 2`; the counting desk's optimistic apply is
+pinned in the test beside it.
+
+**What it cost to find, worth keeping:** two of the three times I was
+wrong here I was reading prose instead of the record. The RESULTS page
+states the refusal and the blank next to each other, and the sequence
+invites the inference that one caused the other. The bridge's MIDI log is
+what ruled it out, in about a minute, and the by-eye reading of §10b's
+own transcript — ALLZERO reporting `scene_current` 2, 9.99 reporting
+empty — is what pointed at the difference being an echo and not a status
+code.

@@ -428,6 +428,9 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			// this option existed recalls the number its own label claims.
 			const number = plain.scene_number ?? plain.scene
 			const { scene: _place, ...rest } = plain
+			// The cast is what lets a scene intent exist with no `scene` at
+			// all. Anything reading one downstream has to allow for that —
+			// localEvent() does, and blanked `scene_current` until it did.
 			out = { ...rest, scene_number: number } as Extract<Intent, { op: 'scene' }>
 		}
 		if (asked === '') return out

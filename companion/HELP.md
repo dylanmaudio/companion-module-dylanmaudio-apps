@@ -334,6 +334,13 @@ Global: `scene_current`, `scene_current_name`, `scene_name_<n>`,
 `connected`, `firmware`, `base_channel`, plus diagnostics
 `gets_in_flight`, `gets_missed`, `unsupported_gets`.
 
+`scene_current` is the place in the list, as the console reports it. On a
+desk that numbers its scenes instead of counting them — a DiGiCo, where
+Snapshot "9.99" is nothing like the ninth — a recall by number says
+nothing about where it sits, so the variable waits for the desk's own
+word: a recall the desk refuses leaves it reading what the desk last
+said.
+
 ## Presets
 
 Template groups per channel type — mute buttons that take the strip's

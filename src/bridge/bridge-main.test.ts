@@ -175,7 +175,13 @@ describe('bridge mode through DliveInstance', () => {
 			{ bridgeToken: ' tok-1 ', ctlToken: 'not-this-one' },
 		)
 		await waitFor(() => inst.link.isOk && ctl.requests.some((r) => r.path === '/ctl/v1/stream'), 'both up')
-		await waitFor(() => auth.some(([path]) => path === '/api/v1/cmd'), 'the cold sync asking')
+		// Both, and not just the cmd: the cold sync is fired off with `void`
+		// before the stream request is made, so a cmd can be logged while
+		// /api/v1/stream has not been asked for yet — a 1-in-6 red suite.
+		await waitFor(
+			() => auth.some(([path]) => path === '/api/v1/cmd') && auth.some(([path]) => path.startsWith('/api/v1/stream')),
+			'the cold sync asking, and the stream open',
+		)
 		for (const kind of ['/api/v1/info', '/api/v1/hello', '/api/v1/state', '/api/v1/stream', '/api/v1/cmd'])
 			expect(
 				auth.some(([path]) => path.startsWith(kind)),

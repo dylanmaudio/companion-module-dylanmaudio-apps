@@ -16,6 +16,16 @@
   and so put the current scene at 0 on every recall. Same cause as the
   snapshot fix above it in this list, in the live stream rather than at
   connect.
+- **And the current scene no longer blanks on a recall by number** (a
+  DiGiCo). The module applies what its own press implies, so a feedback
+  lights without waiting for the desk — but a recall by number carries no
+  place to apply ("9.99" is not the ninth snapshot), and it was applying
+  the missing one anyway, emptying `scene_current` on every recall until
+  the desk's echo arrived a few milliseconds later. Where no echo came —
+  a Quantum 112 refusing a snapshot that doesn't exist — the variable
+  stayed empty for the rest of the session. A number is no longer taken
+  for a place: the variable now waits for the desk's own word, and a
+  refused recall leaves it as it was.
 - **Scene recall takes a scene list.** A Yamaha DM7 keeps two, A and B. A
   new **Scene list** box names one; empty means the desk's only list, which
   is every other console. A list the desk does not have recalls nothing and

@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BridgeLink, deltaToEvent, type BridgeLinkOptions } from './bridgelink.js'
 import { encode, toHex } from '../protocol/encode.js'
+import { SCENE_PATH } from '../state/model.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const exchanges = JSON.parse(readFileSync(join(here, '..', '..', 'fixtures', 'api', 'exchanges.json'), 'utf8')) as {
@@ -674,6 +675,46 @@ describe('BridgeLink', () => {
 		fresh.stop()
 	})
 
+	it('leaves the current scene alone on a by_number recall instead of blanking it', async () => {
+		// The place is stripped on a by_number desk, so there is nothing to
+		// apply optimistically: 9.99 is not the ninth snapshot. This used to
+		// apply `scene: undefined` anyway, which blanked `scene_current` on
+		// every recall — hidden by the desk's echo arriving a few ms later,
+		// and permanent when none came. On a Quantum 112, 4 Nov, snapshot
+		// 9.99 does not exist, MIDI Bridge refused it with 400 desk_state,
+		// the desk said nothing, and the variable stayed empty for the rest
+		// of the session.
+		link.stop()
+		bridge.console = {
+			driver: 'digico',
+			title: 'DiGiCo',
+			verified_on_desk: true,
+			scenes: { noun: 'Snapshot', first: 1, last: null, by_number: true },
+		}
+		bridge.cmds.length = 0
+		const fresh = new BridgeLink({
+			host: '127.0.0.1',
+			port: bridge.port,
+			laneName: 'sd-scene-keep',
+			baseChannel: 1,
+			retryMs: 50,
+		})
+		fresh.start()
+		await waitFor(() => fresh.status === 'ok', 'ok')
+
+		// where the desk had got to: its own echo of an earlier recall
+		bridge.pushEvent('scene', { number: 2 })
+		await waitFor(() => fresh.state.currentScene === 2, 'scene 2 from the desk')
+
+		const changed: string[][] = []
+		fresh.on('changed', (paths) => changed.push(paths))
+		expect(fresh.send({ op: 'scene', scene: 1, scene_number: 9.99 })).toBe(true)
+		await waitFor(() => bridge.cmds.some((c) => (c.body.intent as { op?: string }).op === 'scene'), 'scene')
+		expect(fresh.state.currentScene).toBe(2)
+		expect(changed.flat()).not.toContain(SCENE_PATH)
+		fresh.stop()
+	})
+
 	it('still recalls by place on a desk that lists its scenes', async () => {
 		// the dLive and the SQ: no by_number, so a recall is unchanged
 		link.stop()
@@ -700,6 +741,8 @@ describe('BridgeLink', () => {
 		const sent = bridge.cmds.at(-1)?.body.intent as Record<string, unknown>
 		expect(sent.scene).toBe(4)
 		expect('scene_number' in sent).toBe(false)
+		// and the place IS applied at once, so a feedback lights on the press
+		expect(fresh.state.currentScene).toBe(4)
 		fresh.stop()
 	})
 
