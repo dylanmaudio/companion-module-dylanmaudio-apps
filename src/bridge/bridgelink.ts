@@ -93,8 +93,15 @@ const SCALED_OPS = new Set(['fader', 'fade', 'send_level', 'get_fader', 'get_sen
  *
  * Neither branch is on the monorepo's main. If a desk reports something else
  * on the day, this line is the only place that needs it.
+ *
+ * `lv1` is for D5 of the LV1 release check, 7 Nov 2026 (test/lv1-d5, not for
+ * release). Read from the running release MIDI Bridge's own /api/v1/info on
+ * this Mac — `console.driver` is the string `lv1` and `verified_on_desk` is
+ * true — not from the brief that asked for it. Everything else that write
+ * needs was already true: `fader_db` and `fade` are on, and the foreign-family
+ * path sends dB only with `db: null` for −∞, which is what MB takes.
  */
-const CONSOLES = ['dlive', 'sq', 'wing', 'digico', 'avantis', 'yamaha']
+const CONSOLES = ['dlive', 'sq', 'wing', 'digico', 'avantis', 'yamaha', 'lv1']
 
 /** Gets in flight during a cold sync: enough to be quick, not a spray (client API §11). */
 const COLD_SYNC_LANES = 4

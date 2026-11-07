@@ -1091,7 +1091,11 @@ describe('BridgeLink', () => {
 			// ids are the monorepo's own: Family("avantis", …) and
 			// Family("yamaha", "Yamaha Rivage PM / DM7 (RCP)") in
 			// sim/session/families.py, one id for both Yamaha desks.
-			expect(bridge.hellos[0].consoles).toEqual(['dlive', 'sq', 'wing', 'digico', 'avantis', 'yamaha'])
+			// `lv1` from 7 Nov, for D5 of the LV1 release check: read from the
+			// running MB's own /api/v1/info (`console.driver` is `lv1`), which
+			// is what MB compares the hello against. Without it MB refuses
+			// every press with wrong_console, which is what failed D5.
+			expect(bridge.hellos[0].consoles).toEqual(['dlive', 'sq', 'wing', 'digico', 'avantis', 'yamaha', 'lv1'])
 			fresh.stop()
 		})
 
@@ -1127,6 +1131,70 @@ describe('BridgeLink', () => {
 			// and nothing claiming a refusal on a desk we are driving
 			expect(said.some((m) => m.includes('dLive bytes'))).toBe(false)
 			expect(said.some((m) => m.includes('No cold sync on a Wing'))).toBe(true)
+			fresh.stop()
+		})
+
+		it('puts D5 on the wire for an LV1: dB with null for −∞, a mute, and a place', async () => {
+			// The LV1 for D5 of the 7 Nov release check (test/lv1-d5). The
+			// console block is the running release MB's own, read from
+			// /api/v1/info on this Mac: driver lv1, verified_on_desk true,
+			// fader_db and fade on, raw off, no sends — and `scenes` NULL, no
+			// scenes object at all.
+			//
+			// So this desk takes a PLACE, and `scene_number` would be a 400
+			// bad_intent at MB's _resolve. The brief read "Scene 3 = the LV1's
+			// place 2", which looked like the #55 hazard; RESEARCH settled it on
+			// the wire instead: the LV1's only scene id is the 0-based place in
+			// /Notify/SceneList, MB numbers scenes place + 1, and "Scene 3" goes
+			// out as /Set/CurSceneIndex [2]. So a button that says Scene 3 sends
+			// place 3, and the Scene field is the desk's own number after all.
+			link.stop()
+			bridge.console = { driver: 'lv1', title: 'LV1', verified_on_desk: true, scenes: null }
+			bridge.caps = { raw: false, fade: true, query: true, fader_db: true, send_level: false }
+			bridge.cmds.length = 0
+			const fresh = new BridgeLink({
+				host: '127.0.0.1',
+				port: bridge.port,
+				laneName: 'lv1-d5',
+				baseChannel: 1,
+				retryMs: 50,
+			})
+			fresh.start()
+			await waitFor(() => fresh.status === 'ok', 'ok')
+
+			// SAFE9, the three presses D5 makes, and nothing in lv
+			fresh.fadeTo({ type: 'input', index: 9 }, { db: -20 }, 0)
+			fresh.fadeTo({ type: 'input', index: 9 }, { db: 0 }, 0)
+			fresh.fadeTo({ type: 'input', index: 9 }, { db: null }, 0)
+			expect(fresh.send({ op: 'mute', type: 'input', index: 9, on: true })).toBe(true)
+			expect(fresh.send({ op: 'scene', scene: 3, scene_number: 3 })).toBe(true)
+			await waitFor(() => bridge.cmds.some((c) => (c.body.intent as { op?: string }).op === 'scene'), 'all five')
+
+			const sent = bridge.cmds.map((c) => c.body.intent as Record<string, unknown>)
+			const faders = sent.filter((i) => i.op === 'fader')
+			// Not in order: each press is its own POST, fired with `void`, so
+			// three in a row race and the module promises nothing about which
+			// lands first. What matters is that all three went, and in dB.
+			expect(faders).toHaveLength(3)
+			expect(faders).toEqual(
+				expect.arrayContaining([
+					{ op: 'fader', type: 'input', index: 9, db: -20 },
+					{ op: 'fader', type: 'input', index: 9, db: 0 },
+					// −∞ is `db: null`, the value MB takes for it. A `level`, `wire`
+					// or `lv` key is refused unsupported_op on this family: the LV1
+					// keeps levels in dB and has no wire scale (DEV: LV1 driver).
+					{ op: 'fader', type: 'input', index: 9, db: null },
+				]),
+			)
+			for (const f of faders) {
+				expect('level' in f).toBe(false)
+				expect('wire' in f).toBe(false)
+			}
+			expect(sent.filter((i) => i.op === 'mute')).toEqual([{ op: 'mute', type: 'input', index: 9, on: true }])
+			// the place, and the number stripped: this block declares no by_number
+			expect(sent.filter((i) => i.op === 'scene')).toEqual([{ op: 'scene', scene: 3 }])
+			// and no cold-sync Gets sprayed at a desk that isn't a dLive
+			expect(sent.some((i) => i.op === 'query')).toBe(false)
 			fresh.stop()
 		})
 
