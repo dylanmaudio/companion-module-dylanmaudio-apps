@@ -308,6 +308,42 @@ What does not work:
    not consume it at all. Adopting it would fix (1) without the operator
    typing anything, on every by_number family at once.
 
+   **The rule for when it is adopted, agreed 8 Nov with the multi-console
+   app thread (MC).** A scene button's name comes from the **place** —
+   `scene.<value>.name`, where `<value>` is what the module already puts
+   in the `scene` field. **Never** by scanning the list for a
+   `scene.<n>.number` that matches the number the operator typed. That
+   holds on the Avantis's place-only scenes and on the Waves LV1 as well
+   as on a by_number desk, so there is one rule and not a per-family one.
+
+   The reason is the trap that already bit in the shop: a name keyed by
+   `number` mislabels exactly the way the operator's hand-typed button
+   did (§10h — "PLACE 3 MUTEODD" against a place 3 that is HALF). On a
+   by_number desk the two keys disagree whenever scenes have been
+   inserted or renumbered, and the one the module sends
+   is the place, so the name must be read by the same key that the recall
+   travels on or the button lies about what it will do.
+
+   MC also said the MIDI Bridge fix going in on its side makes `number`
+   **absent**, not zero, on a place-only desk — on the LV1 it had been
+   the wire's 0-based position, where the spec wants the number on
+   screen, and the LV1 has none. That is their change, not verified from
+   here, and it is the second reason not to key on `number`: a module
+   that matched on it would have matched 0 against place 1. The guard
+   this repo already has for the same shape is `forgotten()` and the
+   `value === null` return in `deltaToEvent` — absent is not zero, and
+   `Number(null) === 0` is what produced both the −∞ fader (§10g) and the
+   invented scene (§10d).
+
+   Nothing is built. Verified read-only against the running module on
+   8 Nov, so the starting point is recorded rather than assumed:
+   `state.sceneNames` is a `Map<number, string>` keyed by place, filled
+   only from a dLive show file or the connection's typed Scene names box,
+   and `sceneName()` is a plain `.get()` — there is no mirror path and no
+   `scene.<n>.name` read anywhere in `src`. On the operator's Companion
+   with a desk connected, `scene_name_1..5` read "Not found" and
+   `scene_current_name` was empty.
+
 ## 5. Stereo
 
 Nothing to do, and that is worth saying plainly after yesterday. Since
