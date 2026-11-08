@@ -575,8 +575,9 @@ all day. **Checked for the whole page, not just the three buttons.**
 Consequences for the record: the fader rows on the Quantum and the
 Avantis are **not exercised** — not an expected refusal, not a module
 fail — and a re-import of the page is needed before any fader row means
-anything. The dB write on any A&H or DiGiCo desk therefore still rests
-on the SD11 run of 27 Oct.
+anything — but **do not re-import the committed block: see §10h**, it
+has since gone stale against the live page. The dB write on any A&H or
+DiGiCo desk therefore still rests on the SD11 run of 27 Oct.
 
 Two lines of the day that did land, from the same log:
 `Bridge rejected scene: desk_state (no snapshot on the console is
@@ -900,3 +901,66 @@ The alternative, MIDI Bridge refusing reads to a lane that declares no
 pre-1.4.93 client on every non-dLive desk, including the other apps, and
 it punishes a client that is reading exactly as the API told it to. Fixing
 the client that mis-reads is the narrower and more honest repair.
+
+### 10h. The committed shop block is stale against the live page, and a re-import would wipe its labels
+
+Found 8 Nov, read-only, and it matters because §10c above tells the next
+reader to re-import the page.
+
+`blocks/shop-check.companionconfig` is **no longer** what is on the
+operator's Companion. The live page is page **2**, named "Shop check" —
+there are ten pages and no page 11, which is worth stating because I told
+the research thread to press `11/1/2` and `11/1/0` earlier the same night.
+There is no page 11, so those presses return 204 while pressing nothing:
+the exact trap §10c warns about. They used the right page, so D5's 8/8
+stands, but the wrong coordinates are in that thread's transcript.
+
+What changed: the live controls are Companion's `button-layered` form with
+text layers carrying per-button labels. The committed block has the older
+button form and **no button text at all**. So the page was extended at the
+desk after the 4 Nov import, by hand. Importing the committed file over
+page 2 would replace working, labelled buttons with unlabelled ones and
+lose work that exists nowhere else. The 4 Nov `fade: 0` fix from §10c **is**
+present on all three live fader buttons, so that part of the committed file
+did survive into what is now live; nothing else about the file can be
+assumed current.
+
+Live page 2 as read on 8 Nov, from a copy of Companion 5.1's `db.sqlite`
+plus its WAL — never the live file, and nothing written:
+
+| cell | label | action |
+|---|---|---|
+| 0/0 | SAFE9 -20 dB | `fader` input 9, db −20, fade 0 |
+| 0/1 | SAFE9 0 dB | `fader` input 9, db 0, fade 0 |
+| 0/2 | SAFE9 -inf | `fader` input 9, db −inf, fade 0 |
+| 0/3 | SAFE9 MUTE on | `mute` input 9, on |
+| 0/4 | SAFE9 MUTE off | `mute` input 9, off |
+| 1/0 | PLACE 1 BASE | `scene_recall` scene 1 |
+| 1/1 | PLACE 2 ALLZERO | `scene_recall` scene 2 |
+| 1/2 | PLACE 3 MUTEODD | `scene_recall` scene 3 — **label wrong**, place 3 is HALF |
+| 1/3 | `$(local:name)`… | `fader` input `$(local:ch)` |
+| 2/0 | No 1.00 BASE | `scene_recall` scene 1, scene_number 1.00 |
+| 2/1 | No 2.00 ALLZERO | `scene_recall` scene 1, scene_number 2.00 |
+| 2/2 | No 2.50 HALF | `scene_recall` scene 1, scene_number 2.50 |
+| 2/3 | No 9.99 BAD | `scene_recall` scene 1, scene_number 9.99 |
+| 2/4 | No 1.00 B LISTB1 | `scene_recall` scene 1, scene_number 1.00, list B |
+| 2/5 | No 1.00 C | `scene_recall` scene 1, scene_number 1.00, list C |
+
+Two things to carry out of that table.
+
+**"PLACE 3 MUTEODD" is typed text, not a module fault.** The action beside
+it is a correct `scene: 3`; the label is the only thing wrong, and place 3
+is HALF. It is the operator's page and the operator's word to change, so it
+was reported rather than edited. It is also the live example behind the
+by-place rule in §4 item 4: a name that disagrees with the place the recall
+travels on makes the button lie about what it will do, whether the
+disagreement was typed by hand or keyed off `scene.<n>.number`.
+
+**Row 2 is the by-number row, and on a `by_number`-false desk every press
+in it recalls place 1.** `sceneForConsole()` strips whichever key does not
+apply, so the number goes and the Scene field — 1 on every row-2 button —
+is what is sent. Row 2 means something only on a desk whose block carries
+`scenes.by_number`; read as a general row it reports five different recalls
+that are all the same recall. That is the row-1/row-2 distinction, and it
+belongs beside §10c's fader-row consequences rather than being rediscovered
+at the next desk.
