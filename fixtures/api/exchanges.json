@@ -1,7 +1,7 @@
 {
   "schema": "dlive-api-fixtures/1",
   "source": "docs/bridge-client-api-v1.md (accepted 2026-08-25; amended 2026-09-07, spec 1a: broadcast-driven mirror 1.2)",
-  "note": "Authority for the Client API wire shapes, BOTH sides: the monorepo server replays requests and asserts responses; the Companion module mocks the server from the same file (vendored by tools/sync_fixtures.sh, monorepo -> module repo — the REVERSE of the protocol fixtures). Matching rules: response bodies are SUBSET-matched (extra server keys are allowed — additive changes don't bump v1, spec §11); '<str>'/'<int>' match any value of that type; '<lane>' is substituted with the lane_id registered by the most recent hello case; 'sends' asserts the exact console-bound hex the request must produce. A request's 'headers' and 'content_type' are sent as given (a body is sent as application/json unless 'content_type' says otherwise); an empty 'sends' asserts that nothing reached the console. Never edit a case to make a test green — change the spec first, then both sides.",
+  "note": "Authority for the Client API wire shapes, BOTH sides: the monorepo server replays requests and asserts responses; the Companion module mocks the server from the same file (vendored by tools/sync_fixtures.sh, monorepo -> module repo — the REVERSE of the protocol fixtures). Matching rules: response bodies are SUBSET-matched (extra server keys are allowed — additive changes don't bump v1, spec §11); '<str>'/'<int>' match any value of that type; '<lane>' is substituted with the lane_id registered by the most recent hello case; a case with 'family' runs against that console's server (with 'codec': true, its codec too; with 'model', the desk has said it is that model; with 'desk', it has first heard those events from its desk, as its driver decodes them), a release build's, and its '<lane>' is the lane the last hello on that server registered; 'sends' asserts the exact console-bound hex the request must produce. A request's 'headers' and 'content_type' are sent as given (a body is sent as application/json unless 'content_type' says otherwise); an empty 'sends' asserts that nothing reached the console. Never edit a case to make a test green — change the spec first, then both sides.",
   "cases": [
     {
       "id": "info.ok",
@@ -33,7 +33,8 @@
       "response": {"status": 200, "body": {"console": {
         "driver": "digico", "title": "DiGiCo",
         "actions": {"noun": "Macro", "fields": [
-          {"id": "macro", "label": "Macro", "min": 1, "max": 999}]}}}}
+          {"id": "macro", "label": "Macro", "min": 1, "max": 999,
+           "named_by": "macro", "pin": "macro_name"}]}}}}
     },
     {
       "id": "console.objects.not_supported",
@@ -115,6 +116,15 @@
         "ok": false, "error": {"code": "unknown_lane"}}}
     },
     {
+      "id": "cmd.keepalive",
+      "note": "#329 (DEV: Show Recorder, 27 Oct): renews the lane and does nothing else. Nothing goes to the console, and no `ack` is emitted on the stream. capabilities.keepalive says the bridge has it.",
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+                  "body": {"v": 1, "session": "main", "lane_id": "<lane>",
+                           "cid": "fx-ka1", "intent": {"op": "keepalive"}}},
+      "response": {"status": 200, "body": {"cid": "fx-ka1", "ok": true}},
+      "sends": []
+    },
+    {
       "id": "cmd.send_level.ok",
       "note": "Ungated 1.1.8. Was cmd.send_level.capability_off (409). The gate's condition was the send LV<->dB law, which the 5 Sept sweep measured identical to the fader's at all 128 steps (report 3.1); spec change recorded in STATUS.md before this case moved.",
       "request": {"method": "POST", "path": "/api/v1/cmd",
@@ -185,6 +195,66 @@
         "ok": false, "error": {"code": "bad_content_type"}}},
       "sends": [],
       "note": "A cross-site page can send text/plain without a preflight; application/json it cannot."
-    }
+    },
+    {
+      "id": "hello.digico",
+      "family": "digico", "codec": true, "model": "SD11",
+      "request": {"method": "POST", "path": "/api/v1/hello",
+        "body": {"v": 1, "session": "main", "name": "Fixture SD Lane", "kind": "app", "consoles": ["digico"]}},
+      "response": {"status": 200, "body": {
+        "lane_id": "<str>", "capabilities": {"unavailable_retry": true}}},
+      "note": "#318: capabilities.unavailable_retry says a desk-state refusal that clears by itself answers 503 <op>_unavailable, not 400 desk_state. Pilot Tone's SD failover requires it."
+    },
+    {
+      "id": "cmd.scene_number.list_unread",
+      "family": "digico", "codec": true, "model": "SD11",
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+        "body": {"lane_id": "<lane>", "cid": "fx-sd1", "intent": {"op": "scene", "scene_number": 2}}},
+      "response": {"status": 503, "body": {
+        "ok": false, "error": {"code": "scene_unavailable"}}},
+      "sends": [],
+      "note": "#318: a recall by the number on screen before the SD's snapshot list is read (or in the 0.5 s after a snapshot is inserted or deleted at the desk) is 503 scene_unavailable: it clears by itself, so a client holds it and tries again; it is no lost link. A number no snapshot has, or two have, stays 400 desk_state."
+    },
+    {
+      "id": "cmd.scene_name.mismatch",
+      "family": "digico", "codec": true, "model": "SD11",
+      "desk": [{"kind": "scene_name", "scene": 1, "number": 1.0, "name": "BASE"}, {"kind": "scene_count", "count": 1}],
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+        "body": {"lane_id": "<lane>", "cid": "fx-sd2", "intent": {"op": "scene", "scene_number": 1, "scene_name": "VERSE"}}},
+      "response": {"status": 400, "body": {
+        "ok": false, "error": {"code": "desk_state"}}},
+      "sends": [],
+      "note": "scenes.name_pin: a recall by number pinned to the name it had when the button was made. The scene at that number is named otherwise, so nothing is recalled, and the message names what it's called now. 400, not 503: it stands until the show changes back."
+    },
+    {
+      "id": "state.scene.current.digico",
+      "family": "digico", "codec": true, "model": "SD11",
+      "desk": [{"kind": "scene_name", "scene": 2, "number": 1.5, "name": "VERSE"}, {"kind": "scene_name", "scene": 1, "number": 1.0, "name": "BASE"}, {"kind": "scene_count", "count": 2}, {"kind": "scene", "scene": 2}],
+      "request": {"method": "GET", "path": "/api/v1/state"},
+      "response": {"status": 200, "body": {"state": {"scene.current": {"number": 2, "name": "VERSE", "scene_number": 1.5}}}},
+      "note": "scene.current carries what the desk's scene event carries: scene_number on a by_number desk, and scene_list (a field this desk doesn't have) on a desk with scenes.lists."
+    },
+    {"id": "hello.digico.sd11", "family": "digico", "codec": true, "model": "SD11", "request": {"method": "POST", "path": "/api/v1/hello", "body": {"v": 1, "session": "main", "name": "Fixture SD Lane", "kind": "app", "consoles": ["digico"]}}, "response": {"status": 200, "body": {"lane_id": "<str>", "capabilities": {"fader_db": true}}}, "note": "Per-model verification (27 Oct): the SD11 is the model the SD driver was checked on, so fader_db holds."},
+    {"id": "info.console.digico.desk_params", "family": "digico", "codec": true, "model": "SD11", "request": {"method": "GET", "path": "/api/v1/info"}, "response": {"status": 200, "body": {"console": {"model": "SD11", "verified_on_desk": true, "pan": {"types": ["input"], "step": null, "pushed": true}, "filters": {"hpf": {"types": ["input"], "freq_hz": [20, 20000]}}, "eq": {"types": ["input"], "pushed": true}}}}, "note": "#243: the block declares what each desk parameter takes, only as written and read on a desk; `model` is the desk's identity."},
+    {"id": "cmd.pan.sd", "family": "digico", "codec": true, "model": "SD11", "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-sd2", "intent": {"op": "pan", "type": "input", "index": 8, "pan": -0.5}}}, "response": {"status": 200, "body": {"ok": true}}, "sends": ["2f 49 6e 70 75 74 5f 43 68 61 6e 6e 65 6c 73 2f 38 2f 50 61 6e 6e 65 72 2f 70 61 6e 00 00 00 00 2c 66 00 00 3e 80 00 00"], "note": "#243: pan −1…+1 (centre 0); the SD's wire is 0…1, so −0.5 is 0.25."},
+    {"id": "cmd.peq.sd", "family": "digico", "codec": true, "model": "SD11", "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-sd3", "intent": {"op": "peq", "type": "input", "index": 8, "band": "1", "gain": 6.0}}}, "response": {"status": 200, "body": {"ok": true}}, "sends": ["2f 49 6e 70 75 74 5f 43 68 61 6e 6e 65 6c 73 2f 38 2f 45 51 2f 65 71 5f 67 61 69 6e 5f 31 00 00 2c 66 00 00 40 c0 00 00"], "note": "#243: one EQ band; band ids are strings and stable."},
+    {"id": "cmd.peq.out_of_range", "family": "digico", "codec": true, "model": "SD11", "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-sd4", "intent": {"op": "peq", "type": "input", "index": 8, "band": "1", "gain": 24.0}}}, "response": {"status": 400, "body": {"ok": false, "error": {"code": "bad_intent"}}}, "sends": [], "note": "#243: outside the declared range (the SD's ±18 dB) is refused, never clamped (the SD drops it silently)."},
+    {"id": "cmd.peq.no_band", "family": "digico", "codec": true, "model": "SD11", "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-sd5", "intent": {"op": "peq", "type": "input", "index": 8, "gain": 3.0}}}, "response": {"status": 400, "body": {"ok": false, "error": {"code": "bad_intent"}}}, "sends": [], "note": "#243: peq takes a band; the whole EQ is `eq`."},
+    {"id": "cmd.pan.unsupported_type", "family": "digico", "codec": true, "model": "SD11", "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-sd6", "intent": {"op": "pan", "type": "aux", "index": 1, "pan": 0.0}}}, "response": {"status": 400, "body": {"ok": false, "error": {"code": "unsupported_op"}}}, "sends": [], "note": "#243: a strip type not yet written on a desk (the SD's buses) is unsupported_op."},
+    {"id": "cmd.query.pan.sd", "family": "digico", "codec": true, "model": "SD11", "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-sd7", "intent": {"op": "query", "type": "input", "index": 8, "fields": ["pan"]}}}, "response": {"status": 200, "body": {"ok": true, "pending": true}}, "note": "#243: these aren't in the cold sync; a query reads them, the answers as deltas."},
+    {"id": "cmd.alt.unsupported", "family": "digico", "codec": true, "model": "SD11", "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-sd-alt1", "intent": {"op": "alt", "type": "input", "index": 1, "on": true}}}, "response": {"status": 400, "body": {"ok": false, "error": {"code": "unsupported_op"}}}, "sends": [], "note": "#304: a strip's main/alt input, only where the block claims `alt` and declares it (the Wing first); the SD's isn't measured yet."},
+    {"id": "cmd.query.alt.unsupported", "family": "digico", "codec": true, "model": "SD11", "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-sd-alt2", "intent": {"op": "query", "type": "input", "index": 1, "fields": ["alt"]}}}, "response": {"status": 400, "body": {"ok": false, "error": {"code": "unsupported_op"}}}, "sends": [], "note": "#304: `query` field `alt` reads the switch and the alt source where the block claims `alt`."},
+    {"id": "hello.digico.sd12", "family": "digico", "codec": true, "model": "SD12", "request": {"method": "POST", "path": "/api/v1/hello", "body": {"v": 1, "session": "main", "name": "Fixture SD Lane", "kind": "app", "consoles": ["digico"]}}, "response": {"status": 200, "body": {"lane_id": "<str>", "capabilities": {"fader_db": false}}}, "note": "Per-model verification: a model the driver wasn't checked on has no fader_db."},
+    {"id": "cmd.mute.desk_unverified", "family": "digico", "codec": true, "model": "SD12", "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-sd8", "intent": {"op": "mute", "type": "input", "index": 1, "on": true}}}, "response": {"status": 400, "body": {"ok": false, "error": {"code": "desk_unverified"}}}, "sends": [], "note": "Per-model verification: in a release build an unverified model's writes are refused, naming the desk; a test build lets them through."},
+    {"id": "hello.digico.unidentified", "family": "digico", "codec": true, "request": {"method": "POST", "path": "/api/v1/hello", "body": {"v": 1, "session": "main", "name": "Fixture SD Lane", "kind": "app", "consoles": ["digico"]}}, "response": {"status": 200, "body": {"lane_id": "<str>"}}, "note": "A desk that hasn't said which model it is yet."},
+    {"id": "cmd.mute.model_unavailable", "family": "digico", "codec": true, "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-sd9", "intent": {"op": "mute", "type": "input", "index": 1, "on": true}}}, "response": {"status": 503, "body": {"ok": false, "error": {"code": "model_unavailable"}}}, "sends": [], "note": "Before the desk has said its model: 503, which a client retries."},
+    {"id": "hello.wing", "family": "wing", "codec": true, "request": {"method": "POST", "path": "/api/v1/hello", "body": {"v": 1, "session": "main", "name": "Fixture Wing Lane", "kind": "app", "consoles": ["wing"]}}, "response": {"status": 200, "body": {"lane_id": "<str>"}}, "note": "#304: the Wing's block, with its codec, for its main/alt cases."},
+    {"id": "cmd.alt.wing", "family": "wing", "codec": true, "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-wing1", "intent": {"op": "alt", "type": "input", "index": 10, "on": true}}}, "response": {"status": 200, "body": {"ok": true}}, "sends": ["2f63682f31302f696e2f7365742f616c74737263000000002c69000000000001"], "note": "#304: a channel to its alt source, /ch/10/in/set/altsrc ,i 1 (RESEARCH's MA.3: taken at once, echoed natively, the surface follows). false puts main back."},
+    {"id": "cmd.alt.no_on", "family": "wing", "codec": true, "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-wing2", "intent": {"op": "alt", "type": "input", "index": 10}}}, "response": {"status": 400, "body": {"ok": false, "error": {"code": "bad_intent"}}}, "sends": [], "note": "#304: alt takes \"on\", true or false."},
+    {"id": "cmd.alt.out_of_range", "family": "wing", "codec": true, "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-wing3", "intent": {"op": "alt", "type": "input", "index": 41, "on": true}}}, "response": {"status": 400, "body": {"ok": false, "error": {"code": "bad_intent"}}}, "sends": [], "note": "#304: past the Wing's 40 channels."},
+    {"id": "cmd.alt.unsupported_type", "family": "wing", "codec": true, "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-wing4", "intent": {"op": "alt", "type": "aux_in", "index": 1, "on": true}}}, "response": {"status": 400, "body": {"ok": false, "error": {"code": "unsupported_op"}}}, "sends": [], "note": "#304: a type not in the block's alt.types (the Wing's aux inputs aren't measured)."},
+    {"id": "cmd.query.alt.wing", "family": "wing", "codec": true, "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-wing5", "intent": {"op": "query", "type": "input", "index": 10, "fields": ["alt"]}}}, "response": {"status": 200, "body": {"ok": true, "pending": true}}, "sends": ["2f63682f31302f696e2f7365742f616c74737263000000002c000000", "2f63682f31302f696e2f636f6e6e00002c7300002a000000"], "note": "#304: the switch and the alt source, read for an app's arm check: altsrc, and the channel's source dump that carries altgrp and altin; the answers as deltas of input.10.alt and input.10.alt_source."},
+    {"id": "state.scene.current.wing", "family": "wing", "codec": true, "desk": [{"kind": "scene", "scene": 4, "name": "UP1", "via": "native"}], "request": {"method": "GET", "path": "/api/v1/state"}, "response": {"status": 200, "body": {"state": {"scene.current": {"number": 4, "name": "UP1"}}}}, "note": "Slot 13 (27 Oct): the Wing's scene report names the loaded scene (its file, from $active), and scene.current is {number, name}, an object, never a number. A `scene` event carries the same two fields, and a `delta` of path scene.current (a name the desk says after the event, or its file renamed at the same place) carries exactly this value. #342: the Companion module read it with Number(value)."},
+    {"id": "state.trigger.wing", "family": "wing", "codec": true, "desk": [{"kind": "trigger_mode", "trigger": "user:U1.1", "mode": "MIDICCP", "sends": true, "via": "native"}, {"kind": "trigger_mode", "trigger": "user:U1.2", "mode": "OFF", "sends": false, "via": "native"}], "request": {"method": "GET", "path": "/api/v1/state"}, "response": {"status": 200, "body": {"state": {"trigger.user:U1.1": {"sends": true, "mode": "MIDICCP"}, "trigger.user:U1.2": {"sends": false, "mode": "OFF"}}}}, "note": "27 Oct (DEV: ROADMAP): a desk key's assignment is state, one path per trigger: trigger.<id> = {sends, mode}, the id the `trigger` event's, verbatim, everything after the first \"trigger.\" (it may hold dots: user:U1.1). sends true means a press reaches the bridge (the Wing: MIDICCP or MIDINP); false, it doesn't (OFF, a toggle, any other mode); mode is the desk's own word. Pushed whole as a delta on change (a Wing scene stores the keys' modes: recalling one can set them OFF). Absent or null is unknown (the OSC fallback; the native session down): a client says it can't check, never treats it as safe."}
   ]
 }

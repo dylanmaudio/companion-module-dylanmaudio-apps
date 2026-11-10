@@ -22,10 +22,11 @@
 import { EventEmitter } from 'node:events'
 import { CHANNEL_TABLE, isChannelType, type ChannelRef, type Colour } from '../protocol/channels.js'
 import { encode, toHex } from '../protocol/encode.js'
+import { dbToLv } from '../protocol/levels.js'
 import { intentSocket, type ConsoleEvent, type Intent } from '../protocol/intents.js'
 import { ConsoleState, CONNECTION_PATH } from '../state/model.js'
 import { SubscriptionRegistry } from '../state/subscriptions.js'
-import type { LinkApi, LinkDiag, LinkEvents, LinkStatus, SyncScope } from '../link-api.js'
+import type { LevelRequest, LinkApi, LinkDiag, LinkEvents, LinkStatus, SyncScope } from '../link-api.js'
 import { localEvent } from '../protocol/localevent.js'
 import { hostPort, httpOrigin, netReason } from '../util/net.js'
 import { StreamWatchdog } from '../util/watchdog.js'
@@ -57,6 +58,43 @@ const FIRST_CLASS = new Set([
  * is the operator's `sendsInDb` setting, and does not read this capability.
  */
 const GATED = new Set(['send_level'])
+
+/**
+ * Ops whose value is a dLive fader scale (0-127 lv). Another family's bridge
+ * takes dB for these, so they stay refused even on a verified desk until the
+ * module speaks that scale.
+ */
+const SCALED_OPS = new Set(['fader', 'fade', 'send_level', 'get_fader', 'get_send_level'])
+
+/**
+ * The console families this build will write to at all, declared at hello
+ * (Client API §1b). A bridge from 1.4.93 refuses writes from a client that
+ * didn't say, on any family but the dLive.
+ *
+ * Naming one here is not a claim that it works: the per-op gate still needs
+ * the bridge's own `verified_on_desk` for that family, and still refuses a
+ * dLive-scaled value or a dLive byte on any of them.
+ *
+ * `avantis` and `yamaha` are here for the four-desk day on 4 Nov 2026, and
+ * both ids are read from the monorepo rather than taken from a message.
+ *
+ * `yamaha` is the driver's own: `YamahaTargetDriver.name` returns it and
+ * `client_profile` puts `"driver": self.name` in the console block, so it is
+ * the string this module will actually compare (topic/yamaha-driver,
+ * shared/target/yamaha/driver.py at d2471478 — a draft, and not registered
+ * yet). One id covers the Rivage and the DM7; the model comes from the desk's
+ * own devinfo, not from the family.
+ *
+ * `avantis` is the family registry's: Family("avantis", "Allen & Heath
+ * Avantis") in sim/session/families.py on topic/cxc-avantis-yamaha. That is
+ * the convention every other family here follows, but it is not the driver
+ * declaring its own name the way the Yamaha's does, so it is the weaker of
+ * the two.
+ *
+ * Neither branch is on the monorepo's main. If a desk reports something else
+ * on the day, this line is the only place that needs it.
+ */
+const CONSOLES = ['dlive', 'sq', 'wing', 'digico', 'avantis', 'yamaha']
 
 /** Gets in flight during a cold sync: enough to be quick, not a spray (client API §11). */
 const COLD_SYNC_LANES = 4
@@ -127,6 +165,41 @@ export function foreignFamily(info: Record<string, unknown>): string | null {
 	return typeof title === 'string' && title !== '' ? title : driver
 }
 
+/** This console names its scenes by number (the DiGiCo SD), not by place. */
+export function sceneByNumber(info: Record<string, unknown>): boolean {
+	const block = info.console
+	if (typeof block !== 'object' || block === null) return false
+	const scenes = (block as { scenes?: unknown }).scenes
+	if (typeof scenes !== 'object' || scenes === null) return false
+	return (scenes as { by_number?: unknown }).by_number === true
+}
+
+/**
+ * The scene lists this console keeps, such as a DM7 Compact's `["A", "B"]`
+ * (Client API v1 §8, `scenes.lists`). Empty on a desk with one list, which
+ * is every other desk we have met.
+ *
+ * Read it from the `console` EVENT as well as from /info: §8 says the block
+ * "can change once the desk says its model", and a Yamaha's model is only
+ * known once the desk has answered with its name.
+ */
+export function sceneLists(info: Record<string, unknown>): string[] {
+	const block = info.console
+	if (typeof block !== 'object' || block === null) return []
+	const scenes = (block as { scenes?: unknown }).scenes
+	if (typeof scenes !== 'object' || scenes === null) return []
+	const lists = (scenes as { lists?: unknown }).lists
+	if (!Array.isArray(lists)) return []
+	return lists.filter((l): l is string => typeof l === 'string' && l !== '')
+}
+
+/** The bridge says this console's driver has been run against a real desk. */
+export function familyVerified(info: Record<string, unknown>): boolean {
+	const block = info.console
+	if (typeof block !== 'object' || block === null) return false
+	return (block as { verified_on_desk?: unknown }).verified_on_desk === true
+}
+
 function errorOf(json: Record<string, unknown>): { code?: string; message?: string } {
 	const e = json.error
 	if (typeof e !== 'object' || e === null) return {}
@@ -154,6 +227,8 @@ interface BridgeCaps {
 	fade?: boolean
 	raw?: boolean
 	send_level?: boolean
+	/** the bridge's dB conversion is verified on a desk for this family's law */
+	fader_db?: boolean
 }
 
 export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
@@ -169,7 +244,14 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	 * `null` means a dLive, which is the only family this version drives.
 	 */
 	private foreignFamily: string | null = null
+	/** the bridge says this family's driver has been run against a real desk */
+	private familyVerified = false
+	/** this desk names its scenes by number, not by place in a list */
+	private sceneByNumber = false
+	/** the scene lists this desk declares, or empty where it keeps one */
+	private sceneListsDeclared: string[] = []
 	private saidForeign = false
+	private readonly saidScaled = new Set<string>()
 	private baseN: number
 	/** the bridge's own base channel, adopted from /info */
 	public bridgeBaseChannel: number | undefined
@@ -241,8 +323,14 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			return false
 		}
 		if (this.refuseForeign(intent.op)) return false
-		void this.postIntent(intent)
-		const local = localEvent(intent)
+		const outgoing = intent.op === 'scene' ? this.sceneForConsole(intent) : intent
+		// A scene recall this console cannot be asked for is refused HERE, not
+		// sent and refused there: a 400 comes back after the press, and we do
+		// not retry one (#318), so the operator would be left with a button
+		// that did nothing and a line in the bridge's log, not ours.
+		if (!outgoing) return false
+		void this.postIntent(outgoing)
+		const local = localEvent(outgoing)
 		if (local) {
 			const changed = this.state.apply(local)
 			if (changed.length) this.emit('changed', changed)
@@ -271,13 +359,126 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		}
 	}
 
-	fadeTo(ref: ChannelRef, toLv: number, durationMs: number): void {
+	fadeTo(ref: ChannelRef, to: LevelRequest, durationMs: number): void {
+		const ms = Math.round(durationMs)
+		// Another family: dB is the only unit that crosses, and the bridge does
+		// the conversion with the law the desk is actually set to.
+		if (this.foreignFamily) {
+			if (!this.familyVerified) {
+				this.refuseForeign('fade')
+				return
+			}
+			if (!('db' in to)) {
+				this.sayOnce(
+					`raw-${ref.type}`,
+					`A raw 0-127 level isn't sent to a ${this.foreignFamily}: that is a dLive wire value. Use Fader: set level (dB).`,
+				)
+				return
+			}
+			if (this.caps.fader_db === false) {
+				this.sayOnce(
+					'fader_db',
+					`Levels aren't sent to a ${this.foreignFamily}: MIDI Bridge hasn't verified its dB law, so a dB here wouldn't land where it says.`,
+				)
+				return
+			}
+			const body =
+				durationMs <= 0 || this.caps.fade === false
+					? { op: 'fader', type: ref.type, index: ref.index, db: to.db }
+					: { op: 'fade', type: ref.type, index: ref.index, to_db: to.db, over_ms: ms }
+			// No optimistic local apply: the desk's own value comes back on the
+			// mirror, and inventing one in a scale we don't own would be a guess.
+			void this.postCmd(body)
+			return
+		}
+		const toLv = 'lv' in to ? to.lv : dbToLv(to.db)
 		if (this.refuseForeign('fade')) return
 		if (durationMs <= 0 || this.caps.fade === false) {
 			this.send({ op: 'fader', type: ref.type, index: ref.index, level: toLv })
 			return
 		}
-		void this.postCmd({ op: 'fade', type: ref.type, index: ref.index, to_lv: toLv, over_ms: Math.round(durationMs) })
+		void this.postCmd({ op: 'fade', type: ref.type, index: ref.index, to_lv: toLv, over_ms: ms })
+	}
+
+	/**
+	 * Address a scene the way this console does, and send only that key.
+	 *
+	 * A dLive, SQ or Wing counts its scenes: `scene` is the position down the
+	 * list. A DiGiCo numbers them, and the number carries decimals — on the
+	 * SD11 of 27 Oct the list ran 1.00, 1.01, 1.03, 1.93, 2.83, so "Scene 4"
+	 * as a place recalls 1.93, the snapshot the desk calls '2'. That is the
+	 * wrong snapshot during a show, the same hazard as #55.
+	 *
+	 * Whichever key does not apply is REMOVED, never left to ride along: a
+	 * `scene` reaching a by_number driver is exactly the place-based recall
+	 * this exists to stop, and the driver would have no way to know we meant
+	 * otherwise. The bridge refuses a number no snapshot has, or one that two
+	 * share, or any recall taken while it is re-reading the list (MIDI Bridge
+	 * 1.4.111, #289), and that refusal is logged.
+	 */
+	private sceneForConsole(intent: Extract<Intent, { op: 'scene' }>): Intent | null {
+		const asked = (intent.scene_list ?? '').trim()
+		const { scene_list: _asked, ...plain } = intent
+		let out: Extract<Intent, { op: 'scene' }>
+		if (!this.sceneByNumber) {
+			const { scene_number: _unused, ...byPlace } = plain
+			out = byPlace
+		} else {
+			// An empty box falls back to the Scene field, so a button built before
+			// this option existed recalls the number its own label claims.
+			const number = plain.scene_number ?? plain.scene
+			const { scene: _place, ...rest } = plain
+			// The cast is what lets a scene intent exist with no `scene` at
+			// all. Anything reading one downstream has to allow for that —
+			// localEvent() does, and blanked `scene_current` until it did.
+			out = { ...rest, scene_number: number } as Extract<Intent, { op: 'scene' }>
+		}
+		if (asked === '') return out
+		const list = this.resolveSceneList(asked)
+		return list === null ? null : { ...out, scene_list: list }
+	}
+
+	/**
+	 * The desk's own spelling of the list the button asked for, or null to
+	 * refuse the press.
+	 *
+	 * An undeclared list, and any list at all on a console with none, is 400
+	 * `bad_intent` at the bridge (spec §8). Refusing here instead says which
+	 * button it was and what the desk actually offers, and says it before the
+	 * press leaves — the alternative is a recall that quietly went to list A.
+	 * Each press says it: a scene recall is one deliberate press, not a stream
+	 * like a fader, and a show button that did nothing has to be loud.
+	 */
+	private resolveSceneList(asked: string): string | null {
+		const lists = this.sceneListsDeclared
+		if (lists.length === 0) {
+			this.emit(
+				'log',
+				'warn',
+				`Nothing recalled: this console keeps one scene list, so there is no list "${asked}" to recall from. ` +
+					`Clear the Scene list box on the button.`,
+			)
+			return null
+		}
+		if (lists.includes(asked)) return asked
+		// The desk's spelling wins where the typing differs only in case: "b"
+		// for a DM7's "B" can only have meant that list, and a show button that
+		// fails on a capital is a bad trade. An ambiguous match is still refused.
+		const fold = lists.filter((l) => l.toLowerCase() === asked.toLowerCase())
+		if (fold.length === 1) return fold[0]
+		this.emit(
+			'log',
+			'warn',
+			`Nothing recalled: this console has no scene list "${asked}". It offers ${lists.map((l) => `"${l}"`).join(' and ')}.`,
+		)
+		return null
+	}
+
+	/** One log line per reason, not one per press. */
+	private sayOnce(key: string, message: string): void {
+		if (this.saidScaled.has(key)) return
+		this.saidScaled.add(key)
+		this.emit('log', 'info', message)
 	}
 
 	fadeSend(src: ChannelRef, dst: ChannelRef, _fromLv: number, toLv: number, _durationMs: number): void {
@@ -366,8 +567,19 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			if (json.ok === false) {
 				this.stats.cmdsFailed++
 				const err = errorOf(json)
+				// capability_off and unsupported_op are settled states: this stays
+				// off until something is changed. Everything else lost a press,
+				// including the self-clearing 503 <op>_unavailable (#318) — the
+				// operator needs to know it didn't land, and we deliberately do
+				// not retry: a scene recall arriving late is its own hazard.
 				const level = err.code === 'capability_off' || err.code === 'unsupported_op' ? 'info' : 'warn'
 				this.emit('log', level, `Bridge rejected ${op}: ${err.code ?? status}${err.message ? ` (${err.message})` : ''}`)
+			} else if (status < 200 || status >= 300) {
+				// A refusal the bridge didn't phrase as {ok: false} — a proxy's
+				// error page, a 503 with no JSON. Without this the press vanishes
+				// with nothing in the log at all.
+				this.stats.cmdsFailed++
+				this.emit('log', 'warn', `Bridge rejected ${op}: HTTP ${status}`)
 			}
 		} catch (e) {
 			this.stats.cmdsFailed++
@@ -468,6 +680,9 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		// See the session report §3.2 and §5.
 		this.caps = info.json.capabilities ?? {}
 		this.foreignFamily = foreignFamily(info.json)
+		this.familyVerified = familyVerified(info.json)
+		this.sceneByNumber = sceneByNumber(info.json)
+		this.sceneListsDeclared = sceneLists(info.json)
 
 		// 2. hello
 		await this.hello()
@@ -492,10 +707,26 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	 */
 	private async coldSync(scope: SyncScope, why: string, session: number): Promise<void> {
 		if (scope === 'none') return
-		// A desk we won't drive isn't worth asking about: the bridge answers a
-		// dLive-shaped Get with bad_intent, once per strip, and the values
-		// wouldn't fit our scale anyway.
-		if (this.refuseForeign('query')) return
+		// Only a dLive is asked. On every other family the mirror is the
+		// better source and the only one: `query` carries dLive-shaped Gets,
+		// which earn one bad_intent per strip there, and the snapshot at
+		// GET /state already holds whatever the bridge knows.
+		//
+		// This used to go through refuseForeign('query'), which gave the same
+		// answer for the right reason on an unverified desk and the wrong
+		// sentence on a verified one — the operator read "query isn't sent on
+		// a Wing: it is encoded as dLive bytes" on a desk the module was
+		// driving perfectly well. The refusal an operator does need to see,
+		// for an unverified family, is the one applyConsoleState puts on the
+		// connection, and refuseForeign still says it on the first real send.
+		if (this.foreignFamily) {
+			this.emit(
+				'log',
+				'debug',
+				`No cold sync on a ${this.foreignFamily}: its values come from the bridge's mirror, not from Gets.`,
+			)
+			return
+		}
 		const wide = scope !== 'names'
 		const jobs = (this.opts.strips ?? []).map(({ type, index }) => {
 			const fields = ['name', 'colour']
@@ -523,6 +754,11 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			session: 'main',
 			name: this.opts.laneName,
 			kind: 'companion',
+			// MIDI Bridge 1.4.93+: a client that doesn't declare its families is
+			// treated as dLive-only and has its writes refused on any other desk.
+			// We name what this build actually handles; the per-op gate above is
+			// still what stops a dLive-scaled value reaching one of them.
+			consoles: CONSOLES,
 		})
 		const refused = refusal(res.status, res.json)
 		if (refused) throw refused
@@ -543,6 +779,11 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 				this.consoleState = String(value)
 				continue
 			}
+			const gone = forgotten(path, value)
+			if (gone) {
+				for (const p of this.state.forget(gone.ref, gone.field)) changed.push(p)
+				continue
+			}
 			const ev = deltaToEvent(path, value)
 			if (!ev) continue
 			for (const p of this.state.apply(ev)) changed.push(p)
@@ -551,8 +792,55 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		this.emit('log', 'debug', `mirror snapshot: ${Object.keys(snapshot).length} paths (${why})`)
 	}
 
+	/**
+	 * The console block, re-read from the `console` event.
+	 *
+	 * The bridge re-sends the whole block whenever it changes (spec §1b: "An
+	 * SSE `console` event carries the whole block"), and two of the things it
+	 * carries are not knowable at connect:
+	 *
+	 * - **`verified_on_desk` on a family verified per model.** The Yamaha
+	 *   driver is checked on the Rivage PM5 and on the DM7 Compact
+	 *   separately, and the bridge can only say which desk it is once that
+	 *   desk has answered with its name. Reading the block at connect alone
+	 *   left this connection refusing every write for the whole session on a
+	 *   desk the bridge had meanwhile verified — the gate of audit §1,
+	 *   failing for a reason no operator could see.
+	 * - **`scenes.lists`**, for the same reason: §8 says to read it from
+	 *   here, because the block "can change once the desk says its model".
+	 *
+	 * Only the gate and the scene shape are re-read. The strips, the mirror
+	 * and the stream are untouched: a block that says more about the desk we
+	 * are already talking to is not a reconnect.
+	 */
+	private applyConsoleBlock(payload: Record<string, unknown>): void {
+		const block = payload.console
+		if (typeof block !== 'object' || block === null) return
+		const info = { console: block }
+		const wasFamily = this.foreignFamily
+		const wasVerified = this.familyVerified
+		this.foreignFamily = foreignFamily(info)
+		this.familyVerified = familyVerified(info)
+		this.sceneByNumber = sceneByNumber(info)
+		this.sceneListsDeclared = sceneLists(info)
+		if (this.foreignFamily === wasFamily && this.familyVerified === wasVerified) return
+		// The gate moved. Let every refusal be said once more — the reasons
+		// they were said for have just changed — and put the new answer on the
+		// connection, which is the only place an operator sees it.
+		this.saidForeign = false
+		this.saidScaled.clear()
+		if (this.foreignFamily && this.familyVerified && !wasVerified) {
+			this.emit(
+				'log',
+				'info',
+				`MIDI Bridge has verified its ${this.foreignFamily} driver on a desk, so this connection will drive it now.`,
+			)
+		}
+		this.applyConsoleState()
+	}
+
 	private applyConsoleState(): void {
-		if (this.foreignFamily) {
+		if (this.foreignFamily && !this.familyVerified) {
 			// Not a transport failure: the link is fine and the desk is the wrong one.
 			this.setStatus(
 				'failure',
@@ -672,7 +960,14 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 		switch (kind) {
 			case 'delta': {
 				this.stats.deltas++
-				const ev = deltaToEvent(typeof payload.path === 'string' ? payload.path : '', payload.value)
+				const path = typeof payload.path === 'string' ? payload.path : ''
+				const gone = forgotten(path, payload.value)
+				if (gone) {
+					const unlearned = this.state.forget(gone.ref, gone.field)
+					if (unlearned.length) this.emit('changed', unlearned)
+					return
+				}
+				const ev = deltaToEvent(path, payload.value)
 				if (!ev) return
 				this.emit('event', ev, 'mixrack')
 				const changed = this.state.apply(ev)
@@ -680,7 +975,15 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 				return
 			}
 			case 'scene': {
-				const ev: ConsoleEvent = { kind: 'scene', scene: Number(payload.number) }
+				// `number` is the place. A desk whose recall has no place to
+				// resolve to sends `number: null` and puts the number on screen
+				// in `scene_number` (spec §8, "A recall that stays a number";
+				// the Yamaha's). `Number(null)` is 0, so the current scene went
+				// to 0 on every recall there — #342 a second time, in the
+				// stream rather than the snapshot.
+				const n = Number(payload.number ?? payload.scene_number)
+				if (!Number.isFinite(n) || n < 1) return
+				const ev: ConsoleEvent = { kind: 'scene', scene: n }
 				this.emit('event', ev, 'mixrack')
 				const changed = this.state.apply(ev)
 				if (changed.length) this.emit('changed', changed)
@@ -689,6 +992,10 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			case 'connection': {
 				this.consoleState = typeof payload.console === 'string' ? payload.console : 'down'
 				this.applyConsoleState()
+				return
+			}
+			case 'console': {
+				this.applyConsoleBlock(payload)
 				return
 			}
 			case 'ack': {
@@ -718,6 +1025,27 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	private refuseForeign(op: string): boolean {
 		const family = this.foreignFamily
 		if (!family) return false
+		// A verified family may be driven — but only with ops whose values carry
+		// no dLive scale. A fader is 0-127 here and the bridge wants dB on any
+		// other desk, so those stay shut until the dB path exists (#SQ 1.2.0).
+		if (this.familyVerified) {
+			// Anything not first-class is encoded here as dLive bytes, so it can
+			// never travel to another desk whatever the bridge says it verified.
+			const dliveBytes = !FIRST_CLASS.has(op) && !GATED.has(op)
+			if (!SCALED_OPS.has(op) && !dliveBytes) return false
+			if (!this.saidScaled.has(op)) {
+				this.saidScaled.add(op)
+				this.emit(
+					'log',
+					'info',
+					dliveBytes
+						? `${op} isn't sent on a ${family}: it is encoded as dLive bytes, which mean something else there.`
+						: `${op} isn't sent on a ${family}: its value is a dLive fader scale, and this desk wants dB. ` +
+								`Mutes, scenes and names work; levels come with the console's own scale.`,
+				)
+			}
+			return true
+		}
 		if (!this.saidForeign) {
 			this.saidForeign = true
 			this.emit(
@@ -744,11 +1072,56 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 // ---------------------------------------------------------------- mapping
 
 /** Bridge mirror path + value → the fixture-contract event our state applies. */
+/**
+ * The field a null delta un-learns, or undefined where a null means nothing
+ * to us. Client API v1 §8: "A path that is absent or null is not known; a
+ * client shows it as such." The Avantis nulls every mute, fader and send on
+ * every recall, a lane's own included ("A recall forgets").
+ *
+ * Sends are not here because nothing reads them in bridge mode anyway: their
+ * path has five segments and `deltaToEvent` takes three (audit §4 item 1).
+ * Names and colours are never nulled by that rule.
+ */
+export function forgotten(path: string, value: unknown): { ref: ChannelRef; field: 'mute' | 'fader' } | undefined {
+	if (value !== null) return undefined
+	const [type, idxStr, field] = path.split('.')
+	if (field !== 'mute' && field !== 'fader') return undefined
+	const index = Number(idxStr)
+	if (!isChannelType(type) || !Number.isInteger(index) || index < 1 || index > CHANNEL_TABLE[type].count)
+		return undefined
+	return { ref: { type, index }, field }
+}
+
 export function deltaToEvent(path: string, value: unknown): ConsoleEvent | undefined {
 	const parts = path.split('.')
 	if (path === 'scene.current') {
-		const n = Number(value)
-		return Number.isInteger(n) && n >= 1 ? { kind: 'scene', scene: n } : undefined
+		// The value is an object: `{number, name}` (spec §8, and
+		// fixtures/api/exchanges.json state.scene.current.wing — "an object,
+		// never a number"). `Number({…})` is NaN, so reading it as a number
+		// dropped it in silence. The cold snapshot's scene never landed and
+		// scene_current read blank until the first recall of the show, which
+		// arrives as a `scene` event instead and goes through another path
+		// (#342; seen on a Wing, 27 Oct, sitting on scene 2 with the variable
+		// empty). A bare number is still accepted — no spec or fixture says a
+		// family sends one, but it costs nothing and an older bridge is not
+		// worth guessing about.
+		// `number` is the place. A desk that cannot list its scenes has no
+		// place to give and sends `number: null` with the screen number in
+		// `scene_number` (DEV: Yamaha driver, 28 Oct, for a Yamaha whose
+		// profile says `places: false`). Falling back to it only when `number`
+		// is absent or null keeps every desk that has places reading exactly
+		// as before, and stops the variable going blank on one that doesn't —
+		// which is this same bug over again. NOT YET IN THE SPEC: the shape is
+		// a driver thread's word until it reaches fixtures/api/exchanges.json,
+		// due 2 Nov, and the test for it says so.
+		const o =
+			typeof value === 'object' && value !== null ? (value as { number?: unknown; scene_number?: unknown }) : null
+		const raw = o ? (o.number ?? o.scene_number) : value
+		const n = Number(raw)
+		// Finite, not integer: an SD11's snapshots are numbered 1.50 and such
+		// (27 Oct), and no fixture yet says what it puts here. An integer test
+		// would drop those the same silent way this bug did.
+		return Number.isFinite(n) && n >= 1 ? { kind: 'scene', scene: n } : undefined
 	}
 	if (path === 'connection.console') return undefined // handled as status
 	if (parts.length !== 3) return undefined
@@ -757,13 +1130,81 @@ export function deltaToEvent(path: string, value: unknown): ConsoleEvent | undef
 	if (!isChannelType(type) || !Number.isInteger(index) || index < 1 || index > CHANNEL_TABLE[type].count)
 		return undefined
 	const ref: ChannelRef = { type, index }
+	// `null` is the bridge saying it does not know (spec §8), and it is not a
+	// value. Reading it as one turned a forgotten mute into "not muted" and a
+	// forgotten fader into level 0, which is −∞: on an Avantis, where every
+	// recall nulls every mute and fader, that was a page of buttons claiming
+	// silence. The caller un-learns the field instead (`forgotten()`).
+	if (value === null) return undefined
 	switch (field) {
 		case 'mute':
 			return { kind: 'mute', ...ref, on: value === true }
 		case 'fader': {
-			const lv = typeof value === 'object' && value !== null ? Number((value as { lv?: unknown }).lv) : Number(value)
+			// Two shapes. The dLive's is {lv, db} and is frozen: lv is 0-127 and
+			// dB comes from our own measured table, so the db it sends is ignored.
+			// Every other family sends {wire, db, steps} — its own resolution,
+			// which may be 16,384 — and its db is the only one we can trust,
+			// because the taper that produced it lives on the desk.
+			if (typeof value === 'object' && value !== null) {
+				const o = value as { lv?: unknown; wire?: unknown; db?: unknown; steps?: unknown }
+				// The dLive's shape, and only it, uses our measured table: its own
+				// db is ignored because ours is calibrated against that taper.
+				if (o.lv !== undefined) {
+					const lv = Number(o.lv)
+					if (!Number.isInteger(lv) || lv < 0 || lv > 127) return undefined
+					return { kind: 'fader', ...ref, level: lv }
+				}
+				// Everyone else reports dB, which is the portable part. A wire
+				// value may come with it (the SQ: {wire, db, steps}) or may not
+				// (the DiGiCo SD: {db, steps: null}). Keying off `wire` dropped
+				// the SD's levels silently — found on an SD11, 27 Oct.
+				const db = o.db === null ? null : Number(o.db)
+				if (db !== null && !Number.isFinite(db)) return undefined
+				const wire = o.wire === undefined ? undefined : Number(o.wire)
+				if (wire !== undefined && !Number.isFinite(wire)) return undefined
+				if (o.db === undefined && wire === undefined) return undefined
+				return { kind: 'fader', ...ref, level: wire, db }
+			}
+			const lv = Number(value)
 			if (!Number.isInteger(lv) || lv < 0 || lv > 127) return undefined
 			return { kind: 'fader', ...ref, level: lv }
+		}
+		case 'stereo': {
+			// Two shapes, per the Client API spec §1b, and a third case that
+			// matters more than either:
+			//
+			//   {linked, half, partner}  the SQ's input pairing. A linked pair
+			//                            moves together, so a module that
+			//                            ignores it shows a fader move on one
+			//                            half and nothing on the other.
+			//   {width: mono|stereo}     the Wing's and the SD's inputs, and
+			//                            every family's MIXES, the SQ included.
+			//                            Says this strip is stereo; says NOTHING
+			//                            about a half or a partner.
+			//   null / anything else     the family CANNOT SAY. The dLive is
+			//                            here: it cannot report an input's link.
+			//
+			// The spec's words are "`stereo: null` means the family can't say,
+			// never mono". We used to answer `linked: o.linked === true` for
+			// every shape, which turned "can't say" and "this mix is stereo"
+			// alike into a confident "not linked" — wrong on the Wing, wrong on
+			// the SD, and wrong on every shipped dLive.
+			if (typeof value !== 'object' || value === null) return undefined
+			const o = value as { linked?: unknown; half?: unknown; partner?: unknown; width?: unknown }
+			const half = o.half === 'A' || o.half === 'B' ? o.half : undefined
+			const partner = Number(o.partner)
+			const width = o.width === 'mono' || o.width === 'stereo' ? o.width : undefined
+			// Only a real boolean is an answer. An absent key is not `false`.
+			const linked = typeof o.linked === 'boolean' ? o.linked : undefined
+			if (linked === undefined && width === undefined) return undefined
+			return {
+				kind: 'stereo',
+				...ref,
+				linked,
+				half,
+				partner: Number.isInteger(partner) && partner > 0 ? partner : undefined,
+				width,
+			}
 		}
 		case 'name':
 			return { kind: 'name', ...ref, name: typeof value === 'string' ? value : '' }

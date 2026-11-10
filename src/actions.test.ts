@@ -53,6 +53,44 @@ describe('Surface-socket actions', () => {
 	it('scene recall still goes out — it is a MixRack message', async () => {
 		const { ctx, sent } = ctxOf()
 		await buildActions(ctx).scene_recall?.callback({ options: { scene: 12 } }, {})
-		expect(sent).toEqual([{ op: 'scene', scene: 12 }])
+		// Both keys leave the action; BridgeLink drops whichever the console
+		// cannot use, because only it knows the family. An empty number box
+		// means "the Scene field is the number", which is true on every desk
+		// where place and number coincide.
+		expect(sent).toEqual([{ op: 'scene', scene: 12, scene_number: 12 }])
+	})
+
+	it('carries a decimal scene number no integer field could hold', async () => {
+		// the SD11, 27 Oct: a snapshot inserted between 1 and 2 is numbered 1.50
+		const { ctx, sent } = ctxOf()
+		await buildActions(ctx).scene_recall?.callback({ options: { scene: 2, scene_number: '1.5' } }, {})
+		expect(sent).toEqual([{ op: 'scene', scene: 2, scene_number: 1.5 }])
+	})
+
+	it('carries the scene list only when the button names one', async () => {
+		// A DM7 Compact keeps two lists (Client API v1 §8). An EMPTY box must
+		// send no field at all: the bridge answers 400 bad_intent for
+		// `scene_list: ""`, so an empty string would refuse every recall on
+		// every desk. BridgeLink drops the field again where the console
+		// declares no lists.
+		const { ctx, sent } = ctxOf()
+		const defs = buildActions(ctx)
+		await defs.scene_recall?.callback({ options: { scene: 1, scene_number: '2.5', scene_list: 'B' } }, {})
+		await defs.scene_recall?.callback({ options: { scene: 1, scene_number: '2.5', scene_list: '' } }, {})
+		await defs.scene_recall?.callback({ options: { scene: 1, scene_number: '2.5', scene_list: '  ' } }, {})
+		expect(sent).toEqual([
+			{ op: 'scene', scene: 1, scene_number: 2.5, scene_list: 'B' },
+			{ op: 'scene', scene: 1, scene_number: 2.5 },
+			{ op: 'scene', scene: 1, scene_number: 2.5 },
+		])
+	})
+
+	it('refuses a scene number that is not one, rather than recalling something else', async () => {
+		// run() logs and swallows, as it does for a bad dB value: a typo must
+		// not fall back to the Scene field and recall a different snapshot.
+		const { ctx, sent, logs } = ctxOf()
+		await buildActions(ctx).scene_recall?.callback({ options: { scene: 1, scene_number: 'two' } }, {})
+		expect(sent).toEqual([])
+		expect(logs.join('\n')).toMatch(/not a scene number/)
 	})
 })

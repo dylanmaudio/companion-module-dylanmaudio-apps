@@ -176,6 +176,20 @@ export function stepLv(lv: number, steps: number): number {
 }
 
 /** Move by ±dB along the table: nearest LV to (current dB + delta). −∞ + delta stays −∞ unless delta > 0 (then from MIN_DB). */
+/**
+ * Step a level in dB, staying in dB.
+ *
+ * `stepDb` below does the same for a dLive wire value, by going out to dB and
+ * back through the measured table. On a console with its own taper there is no
+ * such table here, so a step has to stay in the portable unit: null is -inf,
+ * and a step down past the bottom lands there.
+ */
+export function stepFromDb(cur: number | null, deltaDb: number): number | null {
+	if (cur === null) return deltaDb > 0 ? MIN_DB + deltaDb - 0.05 : null
+	const target = cur + deltaDb
+	return target < MIN_DB - 2.5 ? null : target
+}
+
 export function stepDb(lv: number, deltaDb: number): number {
 	const cur = lvToDb(lv)
 	if (cur === null) return deltaDb > 0 ? dbToLv(MIN_DB + deltaDb - 0.05) : 0

@@ -1,0 +1,80 @@
+{
+ "schema": "session-protocol/1",
+ "family": "sq",
+ "title": "Companion on the shop's SQ5+: the re-check rows",
+ "version": "2026-11-03 draft 1 (Dev: Bitfocus Companion module, for RESEARCH's 4 Nov sheets; the module at topic/avantis-yamaha 69635f4 or later) + 4 Nov revision (the Quantum's CO: the fader_db gate, and the refusal lines are in Companion's log)",
+ "sources": [
+  "docs/shop-day-2026-11-04-plan.md (topic/session-days 43099249)",
+  "docs/prepared-show-spec-2026-11.md (the answer key: names, the baseline, the scenes)",
+  "docs/status/console-checklist.md on main (the shop section, and the dLive and SQ re-check rows)",
+  "the module: topic/avantis-yamaha 284e6df, run from source through Companion's dev-module symlink",
+  "docs/audit-avantis-yamaha-2026-10-28.md (module repo) §1b, §3, §4, §7"
+ ],
+ "tests": [
+  {
+   "id": "CO",
+   "tier": "must",
+   "title": "Companion on the shop's SQ5+: the re-check rows — from source, about 3 min (almost all of it over HTTP)",
+   "answers": "the module thread; the checklist's SQ row: 'Companion: stereo variables, scene_current on connect — survey (the module changed)'",
+   "expect": "as the dLive's, with the SQ's own answers: the SQ DOES report a link, so linked_ch11 / partner_ch11 / width_ch11 should carry the pair rather than being empty; levels are dB-native on an SQ, so fader_ch1 comes from the desk's own figure and not our table",
+   "record": "the module's SHA; every variable read, with its value; the connection status string; MIDI Bridge's log over the block (writes, echoes, scene events with number and name, and the 400s); Companion's log for the dylanmaudio connection",
+   "safety": "Every write is on SAFE9 (Input 9: no source patched, no output patched, no main assign) or is a scene recall of DMA TEST's own scenes. Nothing in DMA TEST is patched to an output and no main assign is on, so no write reaches audio on any of these desks. The block ends by recalling BASE, which puts SAFE9 and Input 8 back as found. The module never writes a level to a desk whose dB law MIDI Bridge has not measured: it refuses and says so.",
+   "steps": [
+    {
+     "do": "note",
+     "prompt": "Page 11 'Shop check' must be imported into Companion ONCE before the first desk (not per desk): Companion -> Buttons -> Import, choose blocks/shop-check.companionconfig from the module repo, and put it on page 11. It carries 14 buttons: row 0 SAFE9's fader and mute, row 1 scenes by place, row 2 scenes by number (including list B and a list the desk hasn't got). It references the existing dylanmaudio connection by id, so the import should map it with nothing to choose. If page 11 is taken, import it anywhere and change the page number in every curl below. Row 0's 'MUTE off' button carries NO feedback: until 4 Nov it carried the same mute feedback as 'MUTE on', so both lit red whenever ch 9 was muted (seen on the Quantum). A page imported before that fix shows the old look -- cosmetic, and it must not fail the mute ask, which is about 'MUTE on'."
+    },
+    {
+     "do": "manual",
+     "text": "CLAUDE, the build (nothing is sent). Companion runs this module from source through a dev-module symlink — /Users/dylanmitrovich/companion-dev-modules/dylanmaudio -> /Users/dylanmitrovich/Documents/GitHub/companion-module-dylanmaudio — and the connection's moduleVersionId is \"dev\", so whatever is in the repo's dist/ IS the module. Check all three: (a) git -C \"/Users/dylanmitrovich/Documents/GitHub/companion-module-dylanmaudio\" rev-parse --short HEAD  → wants 69635f4 or any later commit on topic/avantis-yamaha, and RECORD what it reads; 69635f4 is the last commit that changed src/, so a later HEAD is docs or these blocks and changes no behaviour; (b) git -C \"/Users/dylanmitrovich/Documents/GitHub/companion-module-dylanmaudio\" status --short  → wants empty (an uncommitted change means dist/ and the SHA do not describe each other); (c) find \"/Users/dylanmitrovich/Documents/GitHub/companion-module-dylanmaudio/dist\" -name '*.js' -newer \"/Users/dylanmitrovich/Documents/GitHub/companion-module-dylanmaudio/src/bridge/bridgelink.ts\" | head -1  → wants a line (dist newer than src; if empty, run corepack yarn build in that checkout and nothing else). There is no package to import and no version to bump: 1.1.93 is the version on every build of this line, so the SHA is the identity. Record the SHA, not the version."
+    },
+    {
+     "do": "manual",
+     "text": "CLAUDE, the desk and the gate (nothing is sent). curl -s 127.0.0.1:8765/api/v1/info and read the console block. Wants: it names the SQ; verified_on_desk true (V applied in A — if it is false the look still RUNS, read-only: every write is refused with the module's own sentence, and that refusal is itself a pass for this step, recorded as 'gate shut'). The SQ's block carries verified_on_desk true. Note the SQ serves ONE MIDI connection: if another app or Companion's own Allen & Heath SQ module holds it, the block's status carries the bridge's busy sentence, and that is the thing to record, not a module fault. NEW TODAY, and worth knowing if V is applied mid-session: the module re-reads this block from the bridge's SSE `console` event, so a desk that becomes verified while Companion is connected starts being driven WITHOUT a reconnect. Before today it would have refused for the rest of the session."
+    },
+    {
+     "do": "manual",
+     "text": "CLAUDE, the connection's own words (nothing is sent): curl -s http://127.0.0.1:8888/api/connections | python3 -m json.tool — the dylanmaudio row's status. Wants category \"ok\" on a verified desk. On an unverified one it reads \"MIDI Bridge is driving a <desk>; this module version drives a dLive only\": copy it word for word, it is the evidence for 'gate shut'. This is the same sentence the operator would read on Companion's Connections tab, so nobody has to look at the screen for it."
+    },
+    {
+     "do": "manual",
+     "text": "CLAUDE, the cold state, read over HTTP (nothing is sent). Run: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/name_ch1/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/name_ch8/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch1/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch5/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/mute_ch8/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/linked_ch11/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/partner_ch11/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/width_ch11/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/scene_current/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/scene_current_name/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/connected/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/gets_missed/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/unsupported_gets/value; Against DMA TEST (prepared-show-spec §Must 2, 6, 8, 11, 13): name_ch1 ZEBRA1, name_ch8 NARWHAL8, fader_ch1 \"0.0\", fader_ch5 \"-20.0\", mute_ch8 true, scene_current 1 (the show is stored with Scene 1 last, so it loads at BASE), connected true. scene_current_name is EXPECTED EMPTY on every desk here: the module only knows scene names from an imported dLive show file, and it does not read the bridge's scene list yet (audit §4 item 4) — empty is a pass, not a fail. linked_ch11 / partner_ch11 / width_ch11 are the stereo pair: whichever of the two forms the desk reports, and EMPTY where the desk cannot say — empty is the right answer there, never false (550c3ba). The SQ's names and colours come from the bridge's MixPad mirror, so they should be there at connect with no Gets of ours."
+    },
+    {
+     "do": "manual",
+     "text": "CLAUDE, the writes, over HTTP. SAFE9 (Input 9) has no source and no output patched and every main assign is off, so none of this reaches audio. In order, 2 s apart: curl -s -X POST http://127.0.0.1:8888/api/location/11/0/0/press (SAFE9 -20 dB); curl -s -X POST http://127.0.0.1:8888/api/location/11/0/1/press (0 dB); curl -s -X POST http://127.0.0.1:8888/api/location/11/0/3/press (MUTE on); curl -s -X POST http://127.0.0.1:8888/api/location/11/0/4/press (MUTE off); curl -s -X POST http://127.0.0.1:8888/api/location/11/0/2/press (-inf, SAFE9 as found). After each, read it back: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch9/value and curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/mute_ch9/value. FADER_DB FIRST (the Quantum, 4 Nov): the three fader presses reach the desk only if the bridge declares its dB law for THIS desk, so read the flag before pressing: curl -s 127.0.0.1:8765/api/v1/info | python3 -c \"import json,sys;d=json.load(sys.stdin);print(d['capabilities'],d['console'].get('model'),d['console'].get('verified_on_desk'))\". capabilities.fader_db FALSE -> the three fader presses are an EXPECTED refusal: nothing is sent, no TX in MIDI Bridge's log, fader_ch9 does not move, and the evidence is in COMPANION's log (not the bridge's), one line per session: \"Levels aren't sent to a <family>: MIDI Bridge hasn't verified its dB law, so a dB here wouldn't land where it says.\" Record that line and the flag and score the step pass-with-note. TRUE -> the faders must move, and a non-move is a real fail. The flag is the bridge's own: _capabilities() withholds fader_db unless Codec.fader_db_verified AND, where the family lists its verified models, this desk's model is one of them -- on the Quantum (SD7Q-Q1) it read false while verified_on_desk read true. Then the scene, by PLACE: curl -s -X POST http://127.0.0.1:8888/api/location/11/1/1/press (place 2, ALLZERO). ALLZERO moves seven faders and unmutes Input 8, so the proof of the recall is scene_current: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/scene_current/value → 2. Read it, but know what it proves: this desk COUNTS its scenes, so the module applies the place it just sent without waiting for the desk (localEvent) — scene_current goes to 2 whether or not the desk moved. It proves the press ran and reached the bridge. The desk's own word is the scene event in MIDI Bridge's log, so on this desk that log is the proof and the variable is the corroboration. Then, the channel read-backs follow, but NOT at once. On the shop's SQ5+ (fw 2.0.2) the recall at 14:35:39.539 on 4 Nov was followed by the first mute at +0.54 s and the first fader at +2.99 s, then the rest about 20 ms apart (masters/mb-dlive-midi-1435-1440.jsonl). So read curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/mute_ch8/value → false after a second, and leave curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch2/value → \"0.0\" until at least 5 s after the press. A blank or stale fader read taken sooner is that timing and not a fault — record the delay you actually saw. The press endpoint is POST and answers 204 whether or not a button is there (checked against this Mac's Companion, 3 Nov: POST /api/location/99/9/9/press → 204, GET → 404), so a 204 proves NOTHING. The proof of every press is the variable read-back above and MIDI Bridge's log."
+    },
+    {
+     "do": "manual",
+     "text": "CLAUDE, #342: the loaded scene on CONNECT, not after a recall. Companion keeps the last value it was given across a disconnect, so reading scene_current while the link is down proves nothing — the test has to be a fresh connect with the desk NOT on scene 1. So: recall ALLZERO first (curl -s -X POST http://127.0.0.1:8888/api/location/11/1/1/press), confirm curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/scene_current/value reads 2, then make the module reconnect. The two ways of reconnecting are NOT equivalent, and only one of them tests this (found 5 Nov, in the module's code): the operator TOGGLES the dylanmaudio connection off and on in Companion's Connections tab (about 5 seconds). That destroys the module's instance and builds a new one, so its ConsoleState starts empty and scene_current can only come from the snapshot. Restarting MIDI Bridge does NOT do that: in bridge mode the module never clears its state on a reconnect — nothing calls state.reset(), and refetchState only APPLIES what the new snapshot carries — so the module still remembers the 2 it had and the read would pass against a completely empty bridge mirror. Use the toggle. Then, BEFORE pressing anything: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/scene_current/value must read 2 again — read out of the bridge's cold snapshot at GET /api/v1/state. 0, blank, or 1 is #342 unfixed. A MIDI Bridge restart is still worth doing as its OWN check, and record it as that: it shows the lane re-hellos, the connection row goes Connecting then OK, and no variable is destroyed by a reconnect. It says nothing about the snapshot. Then CLAUDE puts the desk back: curl -s -X POST http://127.0.0.1:8888/api/location/11/1/0/press (BASE — place 1), then the proof is curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/scene_current/value → 1, then curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch2/value → \"-5.0\" and curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/mute_ch8/value → true, remembering the +3 s the faders take here. BASE also puts SAFE9 back, whatever the writes above left it at."
+    },
+    {
+     "do": "ask",
+     "question": "On Companion's Connections tab, the dylanmaudio row is green/OK (not Connecting or an error)?",
+     "choices": [
+      "pass",
+      "fail"
+     ],
+     "rehearse": {
+      "answer": "pass"
+     }
+    },
+    {
+     "do": "ask",
+     "question": "Press page 11's 'SAFE9 MUTE on' button: does that button go red while SAFE9 is muted, and back when you press 'MUTE off'?",
+     "choices": [
+      "pass",
+      "fail"
+     ],
+     "rehearse": {
+      "answer": "pass"
+     }
+    },
+    {
+     "do": "note",
+     "prompt": "CO: the module's SHA; every variable read above with its value; the connection status string word for word; MIDI Bridge's log over the block (each write, each echo, each scene event with its number and name, and the refusal of 9.99 -- which is in COMPANION's log, not the bridge's: the bridge refuses a number not in the list before it touches the desk, so there is no TX, and the module's line reads \"Bridge rejected scene: desk_state (...)\" (or scene_unavailable if the snapshot list is still being read). Grep Companion's log for \"Bridge rejected\"); and Companion's own log for the dylanmaudio connection over the block (Settings -> Log, or ~/Library/Logs/companion). Anything the operator said."
+    }
+   ]
+  }
+ ]
+}

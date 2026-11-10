@@ -18,7 +18,25 @@ export type Intent =
 	| { op: 'peq'; type: ChannelType; index: number; band: number; param: PeqParam; value: number }
 	| { op: 'hpf_freq'; index: number; value: number }
 	| { op: 'hpf_on'; index: number; on: boolean }
-	| { op: 'scene'; scene: number }
+	// `scene` is the position down the list, counting from 1. `scene_number`
+	// is the number the desk shows, which carries decimals on a DiGiCo (1.50
+	// sits between 1 and 2). BridgeLink picks the one the console understands
+	// from scenes.by_number; both ride along so the choice is made there.
+	//
+	// `scene_list` names which list the number is in, on a desk that keeps
+	// more than one — a DM7 Compact's A and B (Client API v1 §8, `scenes.lists`).
+	// It is bridge-only, like `scene_number`: no dLive byte carries it, and
+	// BridgeLink strips it on a console that declares no lists, because the
+	// bridge answers 400 `bad_intent` for a list on a desk that has none.
+	//
+	// A fourth key exists bridge-side and is NOT sent from here:
+	// `scene_name`, the name-pin (`scenes.name_pin`, exchanges
+	// `cmd.scene_name.mismatch`, monorepo 8003fe93 on main as of 5 Nov) —
+	// a recall by number pinned to the name the button was built with,
+	// refused 400 `desk_state` if the scene at that number is called
+	// something else now. It would be a new option on a shipped action,
+	// which is free to add but is the operator's call, so it waits.
+	| { op: 'scene'; scene: number; scene_number?: number; scene_list?: string }
 	| { op: 'cue_list'; id: number }
 	| { op: 'surface_cc'; cc: number; value: number }
 	| { op: 'action'; cc: number; value: number }
@@ -102,7 +120,43 @@ export const INTENT_TIER: Record<IntentOp, 'hardware' | 'two-impl' | 'single' | 
  */
 export type ConsoleEvent =
 	| { kind: 'mute'; type: ChannelType; index: number; on: boolean }
-	| { kind: 'fader'; type: ChannelType; index: number; level: number }
+	| {
+			kind: 'stereo'
+			type: ChannelType
+			index: number
+			/**
+			 * The desk links this strip to a partner. `undefined` means the
+			 * family CANNOT SAY — the Client API spec §1b is explicit that
+			 * `stereo: null` means that, never mono — so it must never be
+			 * flattened to false. A dLive cannot report an input's link at
+			 * all, and that is most of the shipped product.
+			 */
+			linked: boolean | undefined
+			/** which half of the pair it is, where the desk says */
+			half: 'A' | 'B' | undefined
+			/** the partner's index on the same type, where the desk says */
+			partner: number | undefined
+			/**
+			 * The strip is itself stereo, as the Wing and the SD report every
+			 * input and the SQ reports every mix: `{"width": "mono"|"stereo"}`.
+			 * It says nothing about a half or a partner, and nothing may be
+			 * inferred about either from it.
+			 */
+			width: 'mono' | 'stereo' | undefined
+	  }
+	| {
+			kind: 'fader'
+			type: ChannelType
+			index: number
+			/**
+			 * The wire value: a dLive lv, or another family's own units.
+			 * Absent where the desk reports only dB — the DiGiCo SD sends
+			 * `{db, steps: null}` with no wire value at all.
+			 */
+			level?: number
+			/** dB as the desk reported it, where it does; undefined on a dLive */
+			db?: number | null
+	  }
 	/**
 	 * A bare `63` with no parameter or level after it. The name is historical:
 	 * no console sends this for a fader move (that was a parser dropping running

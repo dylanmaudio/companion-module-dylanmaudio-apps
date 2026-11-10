@@ -17,8 +17,19 @@ export function localEvent(intent: Intent): ConsoleEvent | undefined {
 			return { kind: 'name', type: intent.type, index: intent.index, name: intent.name }
 		case 'set_colour':
 			return { kind: 'colour', type: intent.type, index: intent.index, colour: intent.colour }
+		// Only a desk that COUNTS its scenes has a place to apply. On one that
+		// numbers them, BridgeLink has already removed `scene` (sceneForConsole)
+		// and left only `scene_number`, so `intent.scene` is undefined here and
+		// the place the desk will land on is not knowable from the number:
+		// 9.99 is not the ninth snapshot. Applying it anyway set
+		// `currentScene = undefined` and blanked `scene_current` on EVERY
+		// recall — invisible while the desk's own echo followed a few ms later,
+		// and permanent when none came. A Quantum 112 refusing snapshot 9.99
+		// left the variable empty for the rest of the session (4 Nov, CO).
 		case 'scene':
-			return { kind: 'scene', scene: intent.scene }
+			return typeof intent.scene === 'number' && Number.isFinite(intent.scene)
+				? { kind: 'scene', scene: intent.scene }
+				: undefined
 		case 'main_assign':
 			return { kind: 'param', type: intent.type, index: intent.index, param: 0x18, value: intent.on ? 0x7f : 0x3f }
 		case 'dca_assign':

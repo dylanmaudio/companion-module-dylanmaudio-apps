@@ -20,6 +20,16 @@ import type { SubscriptionRegistry } from './state/subscriptions.js'
 export type SyncScope = 'names' | 'names_state' | 'all' | 'none'
 
 /** `refused`: the far end won't take this connection as configured (a token) — retrying can't fix it */
+/**
+ * A level, in the scale the caller actually meant.
+ *
+ * dB is portable between console families; a 0-127 lv is a dLive wire value
+ * and means nothing on a desk with another resolution. The link resolves this
+ * against the family it is attached to, so nothing above here has to know
+ * which desk is on the other end.
+ */
+export type LevelRequest = { lv: number } | { db: number | null }
+
 export type LinkStatus = 'disconnected' | 'connecting' | 'probing' | 'ok' | 'failure' | 'refused'
 
 export interface LinkEvents {
@@ -52,7 +62,7 @@ export interface LinkApi extends EventEmitter<LinkEvents> {
 	/** Ask for a value; the answer arrives as a state change on `path`. */
 	query(intent: Intent, path: string, priority?: 'high' | 'normal' | 'low'): void
 	/** Timed dB-linear fade of a strip fader. */
-	fadeTo(ref: ChannelRef, toLv: number, durationMs: number): void
+	fadeTo(ref: ChannelRef, to: LevelRequest, durationMs: number): void
 	/** Timed fade of a send level (best effort; sends are gated pre-calibration). */
 	fadeSend(src: ChannelRef, dst: ChannelRef, fromLv: number, toLv: number, durationMs: number): void
 	/** Re-read console state (scope is advisory; bridge mode refetches its mirror). */

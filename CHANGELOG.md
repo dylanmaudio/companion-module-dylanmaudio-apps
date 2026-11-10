@@ -1,5 +1,102 @@
 # Changelog — dylanmaudio-apps (Bitfocus Companion module)
 
+## 1.2.0-test.1 — 2026-11 (TEST BUILD, not for the store)
+
+Not a release. A build for the operator to load in Companion and test
+against real desks: 1.1.2's code with the multi-console drivers merged in
+and Show Recorder's control app included. The published module is still
+1.0.3 and 1.1.2 is with the Bitfocus reviewer; nothing here has been
+reviewed or submitted. Switch a connection back with Module Version →
+Change → 1.0.3.
+
+### Show Recorder
+
+- **Show Recorder joins the apps this module drives** (`sr`, port 8775),
+  with its controls, state and key labels, like the other four.
+
+### The console drivers
+
+- **A desk the bridge verifies while you are connected now works** without
+  reconnecting. MIDI Bridge re-sends its console block whenever it changes,
+  and the module was reading it only at connect — so on a console the bridge
+  can only identify after asking the desk its model (a Yamaha: the Rivage
+  PM5 and the DM7 Compact are verified separately), the connection could sit
+  there saying "this module version drives a dLive only" for the whole
+  session on a desk it was free to drive. The scene settings are re-read from
+  the same block.
+- **A value the bridge says it no longer knows is no longer invented.** The
+  Client API sends `null` for a path it cannot answer, and on an Allen &
+  Heath Avantis every scene recall — including one pressed from Companion —
+  forgets every mute and level, because the desk sends the recall and none
+  of the values it changed. The module read that `null` as a value: a
+  forgotten mute became "not muted", and a forgotten fader became level 0,
+  which is −∞. So after a recall on that desk every input read un-muted at
+  −∞, stated as fact. It now un-learns the field instead, and the variable
+  goes blank, which is the honest answer and what the Client API asks a
+  client to show. On a dLive nothing changes: that mirror keeps the values
+  until something re-reads them.
+- **A recall that reports no place no longer puts the current scene at 0.**
+  A scene event can carry `number: null` with the number on screen beside
+  it, and `Number(null)` is 0, so the current scene went to 0; the module
+  now reads the screen number instead. Written for a Yamaha on the driver
+  thread's word of 28 Oct, which that thread withdrew on 5 Nov: every
+  Yamaha recall reports its place, and the two families whose own recall
+  the bridge announces at send (the Wing, the Avantis) count their scenes
+  and so fill the place in. So this is a guard against a 0 that no shipped
+  desk produces today, not a fix an operator will see. Same cause as the
+  snapshot fix above it in this list, in the live stream rather than at
+  connect.
+- **And the current scene no longer blanks on a recall by number** (a
+  DiGiCo). The module applies what its own press implies, so a feedback
+  lights without waiting for the desk — but a recall by number carries no
+  place to apply ("9.99" is not the ninth snapshot), and it was applying
+  the missing one anyway, emptying `scene_current` on every recall until
+  the desk's echo arrived a few milliseconds later. Where no echo came —
+  a Quantum 112 refusing a snapshot that doesn't exist — the variable
+  stayed empty for the rest of the session. A number is no longer taken
+  for a place: the variable now waits for the desk's own word, and a
+  refused recall leaves it as it was.
+- **Scene recall takes a scene list.** A Yamaha DM7 keeps two, A and B. A
+  new **Scene list** box names one; empty means the desk's only list, which
+  is every other console. A list the desk does not have recalls nothing and
+  says so, rather than silently recalling from the other one.
+
+- **Linked stereo pairs are no longer invisible** (#268). MIDI Bridge
+  reports `{linked, half, partner}` per strip and the module was dropping
+  it, so a pair looked like two unrelated strips: a fader move on one
+  half showed nothing on the other, and a channel picker stepped through
+  both halves of a pair. It now lands at connect with the rest of the
+  mirror. New per-strip variables `linked_*` and `partner_*`, and three
+  feedbacks — partner number, half (A/B), and is-linked. The partner
+  feedback takes an expression index on purpose: a picker needs the
+  partner of whichever channel it is pointed at, and Companion can't
+  nest `$(dlive:partner_ch$(custom:ch))`.
+- **Levels on a console that isn't a dLive.** A fader was a 0–127 dLive
+  wire value all the way down, which is unity here and near silence on a
+  14-bit desk. The level a caller asks for now carries its own scale —
+  dB, or a dLive lv — and the link resolves it against the family it is
+  attached to: dB goes to another desk as `db` / `to_db` and the bridge
+  converts with the law that desk is actually set to. A raw 0–127 is
+  refused there and says why, because there is no honest way to read it.
+- **The level that comes back is the desk's own.** Another family's
+  mirror sends `{wire, db, steps}`; we keep its dB rather than running
+  its wire value through the dLive taper. The dLive's `{lv, db}` is
+  unchanged, and its dB still comes from our measured table.
+- **Nudges step in dB**, which every family understands, instead of
+  stepping the dLive's table.
+- Levels stay held back when `capabilities.fader_db` is false: that means
+  the bridge hasn't verified that family's law on a desk, so a dB would
+  not land where it says.
+- **The current scene no longer reads blank until the first recall**
+  (#342). The mirror reports it as `{number, name}`, an object, and the
+  module read that as a number: `Number({…})` is NaN, so the value was
+  dropped without a word. A connection made mid-show — which is every
+  connection, after a Companion restart — left `scene_current` and
+  `scene_current_name` empty while the desk sat on a scene, and they only
+  filled in when someone recalled the next one. Seen on a Behringer Wing,
+  27 Oct, parked on scene 2 with both variables blank. A decimal scene
+  number (an SD's 1.50) is kept rather than discarded as well.
+
 ## 1.1.2 — 2026-11
 
 A review-fix release. Nothing in it changes what a button does — except

@@ -7,6 +7,21 @@ import {
 	type ChannelType,
 } from './protocol/channels.js'
 import { formatDb, lvToDb } from './protocol/levels.js'
+import type { StripState } from './state/model.js'
+
+/**
+ * A strip's level in dB.
+ *
+ * The desk's own figure wins where it sends one: another family's taper is
+ * its own, and our measured table is the dLive's. Only fall back to the table
+ * when nothing was reported, which is every dLive.
+ */
+const fmtDb = (db: number | null | undefined): string => (db === undefined ? '' : formatDb(db, { unit: false }))
+
+function stripDb(s: StripState): number | null | undefined {
+	if (s.db !== undefined) return s.db
+	return s.level === undefined ? undefined : lvToDb(s.level)
+}
 import type { ConsoleState } from './state/model.js'
 
 /** Variable-name slug per type: $(dlive:name_ch12), $(dlive:mute_dca3), $(dlive:fader_aux5)… */
@@ -83,7 +98,12 @@ export function variableDefinitions(
 		defs[stripVar('mute', ref)] = { name: `${label} mute (true/false)` }
 		if (ref.type !== 'mute_group') {
 			defs[stripVar('fader', ref)] = { name: `${label} fader (dB)` }
-			defs[stripVar('fader_lv', ref)] = { name: `${label} fader (0–127)` }
+			defs[stripVar('fader_lv', ref)] = { name: `${label} fader (wire value)` }
+			defs[stripVar('linked', ref)] = {
+				name: `${label} is half of a linked pair (true/false, empty where the desk can't say)`,
+			}
+			defs[stripVar('partner', ref)] = { name: `${label} linked partner's number` }
+			defs[stripVar('width', ref)] = { name: `${label} is itself mono or stereo, where the desk says` }
 		}
 	}
 	for (const n of sceneNumbers) defs[`scene_name_${n}`] = { name: `Scene ${n} name` }
@@ -131,8 +151,15 @@ export function stripValues(state: ConsoleState, ref: ChannelRef): CompanionVari
 		[stripVar('mute', ref)]: s.mute ?? false,
 	}
 	if (ref.type !== 'mute_group') {
-		v[stripVar('fader', ref)] = s.level === undefined ? '' : formatDb(lvToDb(s.level), { unit: false })
+		v[stripVar('fader', ref)] = fmtDb(stripDb(s))
 		v[stripVar('fader_lv', ref)] = s.level ?? ''
+		// '' where the desk cannot say, NOT false. The spec is explicit that
+		// `stereo: null` means the family can't report a link, and a dLive —
+		// the whole of the shipped product — can never report one. Reading
+		// `false` there stated as fact something no console ever said.
+		v[stripVar('linked', ref)] = s.stereo?.linked ?? ''
+		v[stripVar('partner', ref)] = s.stereo?.partner ?? ''
+		v[stripVar('width', ref)] = s.stereo?.width ?? ''
 	}
 	return v
 }
@@ -171,8 +198,15 @@ export function valuesForPaths(
 				break
 			case 'fader':
 				if (ref.type !== 'mute_group') {
-					v[stripVar('fader', ref)] = s.level === undefined ? '' : formatDb(lvToDb(s.level), { unit: false })
+					v[stripVar('fader', ref)] = fmtDb(stripDb(s))
 					v[stripVar('fader_lv', ref)] = s.level ?? ''
+				}
+				break
+			case 'stereo':
+				if (ref.type !== 'mute_group') {
+					v[stripVar('linked', ref)] = s.stereo?.linked ?? ''
+					v[stripVar('partner', ref)] = s.stereo?.partner ?? ''
+					v[stripVar('width', ref)] = s.stereo?.width ?? ''
 				}
 				break
 		}

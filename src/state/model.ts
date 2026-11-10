@@ -28,7 +28,28 @@ export interface StripState {
 	colour: Colour
 	colourKnown: boolean
 	mute: boolean | undefined
+	/** the wire value: a dLive lv (0-127), or another family's own units */
 	level: number | undefined
+	/**
+	 * The desk's stereo link for this strip, where it reports one. A linked
+	 * pair moves together on the desk, so treating the halves as independent
+	 * strips is how a module shows a fader move on one and not the other.
+	 */
+	stereo:
+		| {
+				linked: boolean | undefined
+				half: 'A' | 'B' | undefined
+				partner: number | undefined
+				width: 'mono' | 'stereo' | undefined
+		  }
+		| undefined
+	/**
+	 * dB as the desk itself reports it, where it does (`{wire, db, steps}`).
+	 * On a dLive this stays undefined and dB is derived from `level` through
+	 * the measured table; on another family there is no such table here, so
+	 * this is the only honest source.
+	 */
+	db: number | null | undefined
 	params: Map<number, number>
 	sends: Map<string, number>
 	/** input → mix assigns, keyed by destination channelKey */
@@ -51,6 +72,10 @@ export function mutePath(ref: ChannelRef): string {
 }
 export function faderPath(ref: ChannelRef): string {
 	return `fader/${channelKey(ref)}`
+}
+
+export function stereoPath(ref: ChannelRef): string {
+	return `stereo/${channelKey(ref)}`
 }
 export function namePath(ref: ChannelRef): string {
 	return `name/${channelKey(ref)}`
@@ -92,6 +117,8 @@ export class ConsoleState {
 				colourKnown: false,
 				mute: undefined,
 				level: undefined,
+				db: undefined,
+				stereo: undefined,
 				params: new Map(),
 				sends: new Map(),
 				mixes: new Map(),
@@ -124,6 +151,30 @@ export class ConsoleState {
 		return this.strip({ type: 'input', index: input }).mixes.get(channelKey(dst))
 	}
 
+	/**
+	 * Un-learn one field, because the bridge said it is no longer known.
+	 *
+	 * Client API v1 §8: "A path that is absent or null is not known; a client
+	 * shows it as such", and on an Avantis every recall nulls every mute,
+	 * fader and send ("A recall forgets"), as deltas with `source: "bridge"`.
+	 * Without this the module kept what it last knew and showed it as fact
+	 * after the desk had been told to forget it.
+	 *
+	 * Returns the changed paths, or none where the field was already unknown.
+	 */
+	forget(ref: ChannelRef, field: 'mute' | 'fader'): string[] {
+		const s = this.strip(ref)
+		if (field === 'mute') {
+			if (s.mute === undefined) return []
+			s.mute = undefined
+			return [mutePath(ref)]
+		}
+		if (s.level === undefined && s.db === undefined) return []
+		s.level = undefined
+		s.db = undefined
+		return [faderPath(ref)]
+	}
+
 	/** Forget everything learned from the desk (keeps show-file scene names). */
 	reset(): string[] {
 		const changed: string[] = []
@@ -148,12 +199,29 @@ export class ConsoleState {
 				s.mute = ev.on
 				return [mutePath(ev)]
 			}
+			case 'stereo': {
+				const s = this.strip(ev)
+				const was = s.stereo
+				if (
+					was &&
+					was.linked === ev.linked &&
+					was.half === ev.half &&
+					was.partner === ev.partner &&
+					was.width === ev.width
+				)
+					return []
+				s.stereo = { linked: ev.linked, half: ev.half, partner: ev.partner, width: ev.width }
+				return [stereoPath(ev)]
+			}
 			case 'fader': {
 				const s = this.strip(ev)
-				if (s.level === ev.level) return []
+				if (s.level === ev.level && s.db === ev.db) return []
 				s.level = ev.level
+				s.db = ev.db
 				return [faderPath(ev)]
 			}
+			// (a desk that reports dB only leaves `level` undefined, which is
+			// what fader_lv_* then shows: unknown, not zero)
 			// Events, not channel state: a ping carries no value, and CC / strip
 			// traffic belongs to whatever is triggering on it, not to the mirror.
 			case 'fader_ping':
@@ -284,6 +352,8 @@ export function eventPaths(ev: ConsoleEvent): string[] {
 			return [mutePath(ev)]
 		case 'fader':
 			return [faderPath(ev)]
+		case 'stereo':
+			return [stereoPath(ev)]
 		case 'fader_ping':
 		case 'cc':
 		case 'strip_fader':

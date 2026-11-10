@@ -21,9 +21,10 @@ import {
 	preampGainToValue,
 	preampValueToGain,
 	stepDb,
+	stepFromDb,
 	stepLv,
 } from './protocol/levels.js'
-import type { PeqParam } from './protocol/intents.js'
+import type { Intent, PeqParam } from './protocol/intents.js'
 import { faderPath, mutePath, paramPath, preampPath, sendPath } from './state/model.js'
 import {
 	CHOICES_ASSIGNABLE_TYPES,
@@ -50,6 +51,31 @@ function num(o: Opts, key: string, dflt = 0): number {
 	const v = o[key]
 	const n = typeof v === 'number' ? v : Number(v)
 	return Number.isFinite(n) ? n : dflt
+}
+
+/**
+ * Scene recall carries two option ids, and which one travels is decided at
+ * run time by the console, not here: BridgeLink sends `scene` on a desk that
+ * counts its scenes and `scene_number` on one that numbers them.
+ *
+ * The frozen `scene` id keeps its meaning. `scene_number` is the new id, for
+ * the decimals a DiGiCo allows ("1.5"), and an empty one falls back to
+ * `scene` so an existing button recalls the number its label already claims.
+ */
+function sceneIntent(o: Opts): Intent {
+	// An empty box is NO LIST, never an empty one: the bridge answers 400
+	// `bad_intent` for `scene_list: ""`, and "no pin means no field" is the
+	// same rule the scene-name pin is written to (Client API v1 §8).
+	const list = str(o, 'scene_list').trim()
+	const inList = list === '' ? {} : { scene_list: list }
+	const typed = str(o, 'scene_number').trim()
+	if (typed !== '') {
+		const n = Number(typed)
+		if (!Number.isFinite(n) || n <= 0) throw new Error(`"${typed}" is not a scene number (try 4 or 1.5)`)
+		return { op: 'scene', scene_number: n, scene: Math.round(num(o, 'scene', 1)), ...inList }
+	}
+	const scene = Math.round(num(o, 'scene', 1))
+	return { op: 'scene', scene_number: scene, scene, ...inList }
 }
 
 function str(o: Opts, key: string, dflt = ''): string {
@@ -146,7 +172,7 @@ export function buildActions(ctx: ModuleContext): CompanionActionDefinitions<Act
 			options: [...channelFields({ types: CHOICES_FADER_TYPES }), DB_FIELD('db', 'Level', '0'), FADE_FIELD],
 			callback: run((o) => {
 				const ref = readChannel(o)
-				link.fadeTo(ref, dbToLv(readDb(o, 'db')), num(o, 'fade'))
+				link.fadeTo(ref, { db: readDb(o, 'db') }, num(o, 'fade'))
 			}),
 			learn: (event) => {
 				try {
@@ -178,12 +204,15 @@ export function buildActions(ctx: ModuleContext): CompanionActionDefinitions<Act
 					)
 					return
 				}
-				link.fadeTo(ref, stepDb(cur, num(o, 'delta', 1)), num(o, 'fade'))
+				// step in dB, which every family understands, rather than in lv
+				const from = link.state.strip(ref).db ?? lvToDb(cur)
+				link.fadeTo(ref, { db: stepFromDb(from, num(o, 'delta', 1)) }, num(o, 'fade'))
 			}),
 		},
 		fader_raw: {
 			name: 'Fader: set raw value (0–127)',
-			description: 'Set a fader by MIDI value; 107 = 0 dB, 0 = −∞',
+			description:
+				'Set a fader by dLive MIDI value; 107 = 0 dB, 0 = −∞. Not sent to other consoles — use Set level (dB) there.',
 			options: [
 				...channelFields({ types: CHOICES_FADER_TYPES }),
 				{ type: 'number', id: 'lv', label: 'Value', default: 107, min: 0, max: 127 },
@@ -207,9 +236,9 @@ export function buildActions(ctx: ModuleContext): CompanionActionDefinitions<Act
 						link.query({ op: 'get_fader', ...ref }, faderPath(ref), 'high')
 						return
 					}
-					link.fadeTo(ref, stepLv(cur, steps), num(o, 'fade'))
+					link.fadeTo(ref, { lv: stepLv(cur, steps) }, num(o, 'fade'))
 				} else {
-					link.fadeTo(ref, Math.max(0, Math.min(127, Math.round(num(o, 'lv', 107)))), num(o, 'fade'))
+					link.fadeTo(ref, { lv: Math.max(0, Math.min(127, Math.round(num(o, 'lv', 107)))) }, num(o, 'fade'))
 				}
 			}),
 		},
@@ -543,8 +572,30 @@ export function buildActions(ctx: ModuleContext): CompanionActionDefinitions<Act
 					min: 1,
 					max: 500,
 				},
+				{
+					type: 'textinput',
+					id: 'scene_number',
+					label: 'Or the number on the desk',
+					tooltip:
+						'Only used on a console that numbers its scenes, such as a DiGiCo, where an inserted ' +
+						'snapshot is numbered 1.50. Leave this empty and the Scene field above is used as the ' +
+						'number. Accepts an expression.',
+					default: '',
+					useVariables: true,
+				},
+				{
+					type: 'textinput',
+					id: 'scene_list',
+					label: 'Scene list (only where the desk keeps more than one)',
+					tooltip:
+						'A Yamaha DM7 keeps two scene lists, A and B. Name one here to recall from it. ' +
+						'Leave this empty on every other console — a list named on a desk that keeps one ' +
+						'refuses the recall rather than guessing. Accepts an expression.',
+					default: '',
+					useVariables: true,
+				},
 			],
-			callback: run((o) => link.send({ op: 'scene', scene: Math.round(num(o, 'scene', 1)) })),
+			callback: run((o) => link.send(sceneIntent(o))),
 		},
 		scene_go: {
 			name: 'Scene: Go (cue list) — needs the Surface socket',

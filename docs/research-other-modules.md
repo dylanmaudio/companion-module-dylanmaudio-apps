@@ -837,3 +837,139 @@ A careless bridge is worse than any of these modules, because it locks out more.
 - #228 (the SQ's MixPad port);
 - #106 and #103 (a bridge on the LAN, for Pi users);
 - #102 (the Quick Reference's connection note).
+
+---
+
+## Appendix — the SQ desk test, 21 Oct 2026
+
+Module 1.1.91 (the 1.1.90 test line) against MIDI Bridge 1.4.92 on an
+SQ-5, `verified_on_desk: true`. The operator was at the desk.
+
+**Worked:**
+
+- **Mute write and mirror.** A MUTE press moved `mute_ch1` false → true
+  and the bridge's `tx_total` by exactly one message. Unmute returned it.
+- **Scene recall.** Scene 2 → 1 → 2, one message each, and
+  `scene_current` followed.
+- **Names, live from MixPad.** `input.1.name` read "jn1" on Scene 2, and
+  the whole set changed with the recall — Scene 1 has default names, so
+  84 name paths went empty but for ST1/ST2/ST3/USB, each marked
+  `default_name: true`. Names track a scene recall without being asked.
+
+**Correctly refused, zero bytes to the desk:** every fader nudge, by the
+dLive-scale guard.
+
+**Found, and fixed before anything reached the console:** the first build
+opened the per-op gate but `applyConsoleState` still forced the
+connection to `failure`, so `state.connected` stayed false and every
+feedback on the page would have read as disconnected.
+
+**For 1.2.0:**
+
+- **`default_name` is not used yet.** On Scene 1 the module shows an
+  empty `name_ch1` where it should fall back to its own label and number
+  ("Input 1"). The bridge already sends the flag.
+- **The SQ has no scene path in the mirror** (490 paths, none for scene),
+  so on connect nothing knows which scene the desk is on. It is learned
+  the first time one is recalled: from 1.4.95 the bridge fires `scene`
+  on **every** SQ recall, a re-recall of the current scene included. So a
+  recall preset can offer an undo once it has seen one go by, but never
+  straight after connecting — and it should say which, rather than
+  offering an undo that silently does the wrong thing.
+- **Cold sync runs on a verified family and costs ~138 messages** of
+  dLive-shaped Gets. Harmless reads, but they should become the family's
+  own addresses before this is anything but a test build.
+
+### Levels on the SQ, verified 21 Oct (module 1.1.92)
+
+With the dB path in, against MIDI Bridge 1.4.92 on the SQ-5:
+
+- **Read:** `fader_ch1` = `0.0` dB with `fader_lv_ch1` = **15196**. That
+  wire value is the SQ's own 14-bit scale (0x765C = 118×128 + 92), which
+  is 0 dB on its linear law — not a 0-127 lv. The desk's dB is what the
+  variable shows; our dLive table is not involved.
+- **Write:** a +1 dB nudge sent one message and came back at `+1.0` dB,
+  wire **15315**. 119 steps for 1 dB matches the law's ~1,187 per 10 dB.
+  The reverse nudge returned it to 15196 exactly.
+- A raw 0-127 level is still refused on a non-dLive family; that path is
+  covered by unit tests rather than a desk press, since the test page has
+  no raw key.
+
+### Bridge ops to pick up later (MIDI Bridge 1.4.95)
+
+- **`batch`** — up to 1,024 mute / fader / send_level / insert items,
+  validated as a whole, one ack, behind `capabilities.batch`. The dLive
+  takes it too, so it is not an SQ-only path. Worth it for the cold sync
+  and for any preset that moves several strips at once, where today we
+  post one request each.
+- **`insert`** — an SQ input's insert, over MixPad. **Not to be built
+  into a public action yet:** it has not been checked on a desk through
+  the bridge, and the Pilot Tone SQ session is what clears it.
+
+### Linked pairs on the SQ, verified 21 Oct (module 1.1.93)
+
+The operator noticed a channel picker stepping 1, 2, 3 across a linked
+1-2 pair. The bridge had been reporting the link all along:
+
+```
+input.1.stereo = {"linked": true, "half": "A", "partner": 2}
+input.2.stereo = {"linked": true, "half": "B", "partner": 1}
+```
+
+Read into the module and confirmed on the desk: inputs 1-2 and 3-4 are
+both linked, each half naming the other.
+
+**The B half has no fader of its own.** `input.2.fader` and
+`input.4.fader` are absent from the mirror — a linked pair has one
+fader between them. So before this, channel 2 read as a strip with no
+level and no reason given. With the link known, a key pointed at a B
+half can show its partner's level instead of a blank.
+
+Not SQ-only: a dLive links pairs too, and the same paths carry it.
+
+### The DiGiCo SD, measured 22 Oct (not driven by this module)
+
+From `sim/captures/2026-10-22-digico-attended/RESULTS.md` on the SD11.
+Recorded here because it is a third shape of the coexistence problem
+§5.3 is about, not because the module drives an SD — MIDI Bridge offers
+it in test builds only.
+
+- **Only one DiGiCo Pad device can be enabled at a time** (#250).
+  Enabling a second switches the first off *by itself*, with no error.
+  So Bitfocus's DiGiCo OSC module and MIDI Bridge cannot both have
+  feedback from one SD: the user picks one. The desk also refuses two
+  entries on the same ports, though a write from any port of the
+  registered IP is accepted.
+
+  That is worse than the dLive's four connections and worse than the
+  SQ's one, because the SQ at least leaves the loser visibly unserved:
+  here the *winner* changes silently under whoever set it up first. If
+  the module ever drives an SD, HELP needs this before anything else.
+
+- **SD macros are a wanted action** (#285), in the operator's words:
+  "We could also use them for streamdeck control through companions".
+  `/Macros/Recall_Macro/<place>` (0-based) fires one over OSC and the
+  desk pushes what it changed. Module side that is a "fire macro"
+  action, blocked until the Client API carries an SD Action shape.
+
+  The shape is agreed (MIDI Bridge 1.4.106): the block's `actions` is
+  `{"noun": "Macro", "fields": [{"id": "macro", "min": 1, "max": 999}]}`
+  and the intent is `{"op": "action", "macro": n}`. **Build the Action
+  options from the block's `fields`, don't hard-code them** — and the
+  dLive already declares its own, so one implementation serves both.
+  `shared/target/dlive/driver.py`'s `client_profile()` returns
+  `{"noun": "Action", "fields": [cc 0-127, value 0-127]}` beside
+  `scenes` and `triggers`, and has since 14 Oct. The SQ's `null` is
+  correct: an SQ has no MIDI Actions.
+
+  **Careful reading `fixtures/api/exchanges.json` for this.** Its hello
+  exchange carries a *subset* of the console block — driver, title,
+  scenes, triggers — so `actions` looks absent there when it is not. I
+  concluded from the fixture that the dLive declared no Actions, and
+  was wrong. Absent from a fixture is not absent on the wire, and the
+  fixture being a subset also means a module test built on it would not
+  catch an Actions regression. Worth completing for both reasons.
+
+  Module side, the `action` intent also stops being
+  `{op, cc, value}` and becomes whatever ids the block names, so the
+  `Intent` type's action variant has to open up.

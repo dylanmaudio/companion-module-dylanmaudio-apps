@@ -122,7 +122,7 @@ describe('ConsoleLink', () => {
 		link.send({ op: 'mute', type: 'input', index: 2, on: true })
 		expect(link.state.strip({ type: 'input', index: 2 }).mute).toBe(true)
 		link.send({ op: 'fader', type: 'input', index: 2, level: 107 })
-		link.fadeTo({ type: 'input', index: 2 }, 95, 500)
+		link.fadeTo({ type: 'input', index: 2 }, { lv: 95 }, 500)
 		vi.advanceTimersByTime(600)
 		const faders = t.sent.filter((s) => s.bytes[1] === 0x63 && s.bytes.length === 9).map((s) => s.bytes[8])
 		expect(faders[0]).toBe(107)

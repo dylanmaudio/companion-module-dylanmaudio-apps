@@ -7,12 +7,24 @@ import {
 import type { ModuleContext } from './context.js'
 import { CHANNEL_TABLE, COLOUR_STYLE, type ChannelRef } from './protocol/channels.js'
 import { formatDb, lvToDb, parseDb } from './protocol/levels.js'
+import type { StripState } from './state/model.js'
+
+/**
+ * A strip's level in dB: the desk's own figure where it reports one (every
+ * family but the dLive), else our measured dLive table. Undefined means the
+ * level isn't known yet, which is not the same as -inf.
+ */
+function levelDb(s: StripState): number | null | undefined {
+	if (s.db !== undefined) return s.db
+	return s.level === undefined ? undefined : lvToDb(s.level)
+}
 import { PARAM_ASSIGN, PARAM_HPF_ON, PARAM_MAIN_ASSIGN } from './protocol/intents.js'
 import {
 	CONNECTION_PATH,
 	SCENE_PATH,
 	colourPath,
 	faderPath,
+	stereoPath,
 	mixPath,
 	mutePath,
 	namePath,
@@ -92,9 +104,8 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 			callback: watch((o, reg) => {
 				const ref = strip(o, reg)
 				reg(faderPath(ref))
-				const lv = link.state.strip(ref).level
-				if (lv === undefined) return null
-				const db = lvToDb(lv)
+				const db = levelDb(link.state.strip(ref))
+				if (db === undefined) return null
 				return db === null ? -100 : db
 			}, null),
 			unsubscribe,
@@ -110,13 +121,50 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 			callback: watch((o, reg) => {
 				const ref = strip(o, reg)
 				reg(faderPath(ref))
-				const lv = link.state.strip(ref).level
-				if (lv === undefined) return false
+				const db = levelDb(link.state.strip(ref))
+				if (db === undefined) return false
 				const th = parseDb(typeof o.db === 'string' || typeof o.db === 'number' ? String(o.db) : '-inf')
 				if (th === undefined) return false
-				const db = lvToDb(lv)
-				if (th === null) return lv > 0
+				if (th === null) return db !== null
 				return db !== null && db >= th
+			}, false),
+			unsubscribe,
+		},
+		stereo_partner: {
+			type: 'value',
+			name: 'Linked partner (number)',
+			description:
+				"The number of the strip this one is linked to, or 0. Read it into a local variable to step a channel picker past the other half of a pair — a plain variable can't be nested.",
+			options: [...channelFields({ types: CHOICES_FADER_TYPES })],
+			callback: watch((o, reg) => {
+				const ref = strip(o, reg)
+				reg(stereoPath(ref))
+				return link.state.strip(ref).stereo?.partner ?? 0
+			}, 0),
+			unsubscribe,
+		},
+		stereo_half: {
+			type: 'value',
+			name: 'Linked half (A / B / empty)',
+			description: 'Which half of a linked pair this strip is. Empty when it is not linked.',
+			options: [...channelFields({ types: CHOICES_FADER_TYPES })],
+			callback: watch((o, reg) => {
+				const ref = strip(o, reg)
+				reg(stereoPath(ref))
+				const st = link.state.strip(ref).stereo
+				return st?.linked ? (st.half ?? '') : ''
+			}, ''),
+			unsubscribe,
+		},
+		stereo_linked: {
+			type: 'boolean',
+			name: 'Strip is half of a linked pair',
+			defaultStyle: { bgcolor: GREEN, color: WHITE },
+			options: [...channelFields({ types: CHOICES_FADER_TYPES })],
+			callback: watch((o, reg) => {
+				const ref = strip(o, reg)
+				reg(stereoPath(ref))
+				return link.state.strip(ref).stereo?.linked === true
 			}, false),
 			unsubscribe,
 		},
@@ -128,8 +176,8 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 			callback: watch((o, reg) => {
 				const ref = strip(o, reg)
 				reg(faderPath(ref))
-				const lv = link.state.strip(ref).level
-				return lv === undefined ? '' : formatDb(lvToDb(lv))
+				const db = levelDb(link.state.strip(ref))
+				return db === undefined ? '' : formatDb(db)
 			}, ''),
 			unsubscribe,
 		},
