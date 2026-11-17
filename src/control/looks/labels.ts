@@ -110,7 +110,7 @@ const looks: [string, KeyLook][] = [
 	['cxc.toggle-solo', { text: 'SOLO' }],
 	['cxc.toggle-arm', { text: 'ARM\nTRACK' }],
 	// its own state lights it, and a muted reference output is a red key, never the toggle's green
-	['cxc.reference_out_mute', { text: 'REF OUT\nMUTE', on: KEY.alarm }],
+	['cxc.reference-out-mute', { text: 'REF OUT\nMUTE', on: KEY.alarm }],
 	[
 		'cxc.conform-console',
 		{ text: 'CONFORM\nCONSOLE', lit: [{ key: 'cxc.console_matches', bg: KEY.attention, invert: true }] },

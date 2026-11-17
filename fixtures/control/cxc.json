@@ -385,7 +385,7 @@
         "group": "app"
       },
       {
-        "id": "cxc.reference_out_mute",
+        "id": "cxc.reference-out-mute",
         "label": "Reference out mute",
         "kind": "toggle",
         "state": "cxc.reference_out_muted",
