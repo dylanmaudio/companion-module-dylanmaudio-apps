@@ -47,12 +47,24 @@ export class CtlMock {
 	frozen = false
 	/** answer every request 401 with this message, as an app that won't take the token would */
 	refuse: string | null = null
+	/**
+	 * Pad /info's reply to about this many bytes. Below ~64 kB a reply fits
+	 * in one buffer and Node reuses the connection however the client leaves
+	 * it, so only a padded reply shows whether the client consumed it.
+	 */
+	infoPadBytes = 0
 	/** a press's handler that takes this long to return */
 	cmdDelayMs = 0
 	private held: ServerResponse[] = []
 	private ring: { seq: number; frame: string }[] = []
 	private streams = new Set<ServerResponse>()
 	requests: { method: string; path: string; headers: IncomingMessage['headers']; body?: Record<string, unknown> }[] = []
+	/**
+	 * How many TCP connections have been accepted in all. A client that
+	 * reads or cancels each reply reuses one; one that drops a Response
+	 * unread leaves it unusable and opens another, so this counts those.
+	 */
+	connections = 0
 
 	constructor(readonly fx: Fixture) {
 		this.catalogue = fx.catalogue
@@ -61,6 +73,9 @@ export class CtlMock {
 
 	async start(): Promise<void> {
 		this.server = createServer((req, res) => void this.handle(req, res))
+		this.server.on('connection', () => {
+			this.connections++
+		})
 		await new Promise<void>((r) => this.server!.listen(0, '127.0.0.1', r))
 		this.port = (this.server.address() as { port: number }).port
 	}
@@ -114,6 +129,7 @@ export class CtlMock {
 		switch (`${req.method} ${path}`) {
 			case 'GET /ctl/v1/info':
 				return json(200, {
+					...(this.infoPadBytes > 0 ? { _pad: 'x'.repeat(this.infoPadBytes) } : {}),
 					v: 1,
 					ctl: this.ctl,
 					app: fx.app.id,

@@ -37,7 +37,7 @@ const ON = combineRgb(0, 150, 60)
 const CHOSEN = combineRgb(30, 90, 200)
 
 /** Sends a press. The connection logs the app's own reason when it refuses. */
-export type Send = (control: string, value?: CmdValue) => Promise<void>
+export type Send = (control: string, value?: CmdValue, abort?: AbortSignal) => Promise<void>
 
 const slug = (id: string): string => id.replace(/\./g, '__')
 
@@ -72,7 +72,12 @@ export function buildControlActions(cat: Catalogue, send: Send): CompanionAction
 		const description = describeControl(c, cat)
 		switch (c.kind) {
 			case 'action':
-				defs[id] = { name: c.label, description, options: [], callback: async () => send(c.id) }
+				defs[id] = {
+					name: c.label,
+					description,
+					options: [],
+					callback: async (_a, ctx) => send(c.id, undefined, ctx.signal),
+				}
 				break
 			case 'toggle':
 				defs[id] = {
@@ -91,7 +96,7 @@ export function buildControlActions(cat: Catalogue, send: Send): CompanionAction
 							],
 						},
 					],
-					callback: async (a) => send(c.id, str(a.options, 'mode', 'toggle')),
+					callback: async (a, ctx) => send(c.id, str(a.options, 'mode', 'toggle'), ctx.signal),
 				}
 				break
 			case 'choice': {
@@ -108,7 +113,7 @@ export function buildControlActions(cat: Catalogue, send: Send): CompanionAction
 							choices: [...choices, { id: 'next', label: 'Next (cycles through them)' }],
 						},
 					],
-					callback: async (a) => send(c.id, str(a.options, 'value', 'next')),
+					callback: async (a, ctx) => send(c.id, str(a.options, 'value', 'next'), ctx.signal),
 				}
 				break
 			}
@@ -152,9 +157,9 @@ export function buildControlActions(cat: Catalogue, send: Send): CompanionAction
 							isVisibleExpression: "$(options:mode) == 'nudge'",
 						},
 					],
-					callback: async (a) => {
-						if (a.options.mode === 'nudge') await send(c.id, { nudge: num(a.options, 'steps', 1) })
-						else await send(c.id, num(a.options, 'value', 0))
+					callback: async (a, ctx) => {
+						if (a.options.mode === 'nudge') await send(c.id, { nudge: num(a.options, 'steps', 1) }, ctx.signal)
+						else await send(c.id, num(a.options, 'value', 0), ctx.signal)
 					},
 				}
 				break
@@ -172,7 +177,7 @@ export function buildControlActions(cat: Catalogue, send: Send): CompanionAction
 							...(c.pattern ? { regex: `/^(?:${c.pattern})$/` } : {}),
 						},
 					],
-					callback: async (a) => send(c.id, str(a.options, 'value', '')),
+					callback: async (a, ctx) => send(c.id, str(a.options, 'value', ''), ctx.signal),
 				}
 				break
 		}

@@ -23,7 +23,7 @@ export interface OpenAppContext {
 	running(): boolean
 	/** The app's catalogue, for its show control */
 	catalogue(): Catalogue | null
-	press(control: string): Promise<void>
+	press(control: string, abort?: AbortSignal): Promise<void>
 	log(level: 'info' | 'warn', message: string): void
 }
 
@@ -32,7 +32,7 @@ export function showControlOf(cat: Catalogue | null, app: AppId): string | null 
 	return cat?.controls.find((c) => c.id === `${app}.show` && c.kind === 'action')?.id ?? null
 }
 
-export async function openApp(ctx: OpenAppContext): Promise<void> {
+export async function openApp(ctx: OpenAppContext, abort?: AbortSignal): Promise<void> {
 	const name = CONTROL_APPS[ctx.app].name
 	if (!ctx.running()) {
 		ctx.log(
@@ -44,7 +44,7 @@ export async function openApp(ctx: OpenAppContext): Promise<void> {
 		return
 	}
 	const show = showControlOf(ctx.catalogue(), ctx.app)
-	if (show) await ctx.press(show)
+	if (show) await ctx.press(show, abort)
 	else
 		ctx.log('info', `${name} is already running. Companion can bring it forward once ${name} offers a "show" control.`)
 }
@@ -56,7 +56,7 @@ export function openAppActions(ctx: OpenAppContext): ReturnType<typeof buildCont
 			name: `Open ${name}`,
 			description: `Brings ${name} to the front. If it isn't running, the log says so: start it first.`,
 			options: [],
-			callback: async () => openApp(ctx),
+			callback: async (_a, c) => openApp(ctx, c.signal),
 		},
 	}
 }

@@ -121,6 +121,10 @@
           "catalogue_hash": "<str>",
           "allowed": true,
           "locked": false,
+          "brand": {
+            "main": {"bg": "#edd473", "text": "#1c1a14"},
+            "deep": {"bg": "#cbaa51", "text": "#1c1a14"}
+          },
           "seq": "<int>"
         }
       }

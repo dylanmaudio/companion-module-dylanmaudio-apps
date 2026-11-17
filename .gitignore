@@ -1,14 +1,13 @@
 node_modules/
-dist/
-pkg/
-*.tgz
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/versions
+package-lock.json
+/pkg
+/*.tgz
+/dist
+DEBUG-*
+/.yarn
+/.vscode
+
+# This module's own, after the template's eight lines above (C1).
 .pnp.*
 .DS_Store
-dylanmaudio-*.tgz
 local/

@@ -383,6 +383,16 @@
         "label": "Show window",
         "kind": "action",
         "group": "app"
+      },
+      {
+        "id": "cxc.reference-out-mute",
+        "label": "Reference out mute",
+        "kind": "toggle",
+        "state": "cxc.reference_out_muted",
+        "group": "audio",
+        "safety": {
+          "off": "critical"
+        }
       }
     ],
     "state": [
@@ -468,6 +478,11 @@
         "type": "string"
       },
       {
+        "key": "cxc.reference_out_muted",
+        "label": "Reference out muted",
+        "type": "bool"
+      },
+      {
         "key": "cxc.playback_mode",
         "label": "Playback mode",
         "type": "enum",
@@ -511,6 +526,7 @@
     "cxc.show_name": null,
     "cxc.dirty": false,
     "cxc.frame_rate": null,
+    "cxc.reference_out_muted": false,
     "cxc.playback_mode": "timeline",
     "cxc.go_standby": 0,
     "cxc.go_standby_name": null,
@@ -538,6 +554,10 @@
           "catalogue_hash": "<str>",
           "allowed": true,
           "locked": false,
+          "brand": {
+            "main": {"bg": "#2e80f2", "text": "#ffffff"},
+            "deep": {"bg": "#214a8f", "text": "#ffffff"}
+          },
           "seq": "<int>"
         }
       }

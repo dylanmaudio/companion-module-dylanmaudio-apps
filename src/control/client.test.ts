@@ -272,6 +272,23 @@ describe('ControlClient across a network (#106)', () => {
 		expect(c.status).toBe('ok')
 	})
 
+	it("stops a press when Companion aborts the button's actions, and doesn't blame the app", async () => {
+		const c = quick({ cmdTimeoutMs: 2000, idleMs: 60_000 })
+		c.start()
+		await waitFor(() => streaming(c), 'stream')
+		mock.cmdDelayMs = 500
+		const abort = new AbortController()
+		const started = Date.now()
+		const pressed = c.cmd('ptt.failback_mode', 'latch', abort.signal)
+		setTimeout(() => abort.abort(), 50)
+		const r = await pressed
+		// 'aborted', not 'not_running': the operator stopped it, the app never
+		// failed. And it gives up at the abort, not at the 2 s press deadline.
+		expect(r).toEqual({ ok: false, status: 0, code: 'aborted' })
+		expect(Date.now() - started).toBeLessThan(400)
+		expect(c.status).toBe('ok')
+	})
+
 	it('a refused token says so, and is asked about again slowly', async () => {
 		mock.refuse = 'Token required'
 		const c = quick({ mismatchRetryMs: 10_000 })
@@ -283,6 +300,28 @@ describe('ControlClient across a network (#106)', () => {
 		const asked = mock.requests.length
 		await new Promise((r) => setTimeout(r, 300))
 		expect(mock.requests.length).toBe(asked)
+	})
+
+	it('reuses one connection for repeated link checks instead of leaving each reply unread', async () => {
+		// L1 (review of v1.1.1): the check sent GET /info and dropped the
+		// Response. Node's fetch holds a connection until its reply is read or
+		// cancelled, so every check left one unusable and opened another; after
+		// an app hangs but keeps answering, a later press waits on connections
+		// the checks still own. Count accepted connections, not requests.
+		const c = quick({ idleMs: 40, idleTickMs: 10 })
+		c.start()
+		await waitFor(() => streaming(c), 'stream')
+		// A small reply fits one buffer and is reused however it is left, so the
+		// difference only shows on a big one. 100 kB is the size measured.
+		mock.infoPadBytes = 100_000
+		const infos = () => mock.requests.filter((r) => r.path === '/ctl/v1/info').length
+		const settled = mock.connections
+		const before = infos()
+		await waitFor(() => infos() >= before + 12, 'twelve link checks', 5000)
+		expect(c.status).toBe('ok') // the checks are answering, so the link stays up
+		// Consumed: one connection serves them all. Dropped or cancelled: one or
+		// two more per check.
+		expect(mock.connections - settled).toBeLessThanOrEqual(2)
 	})
 
 	it("doesn't call an app on another machine 'not running' when it can't be reached", async () => {

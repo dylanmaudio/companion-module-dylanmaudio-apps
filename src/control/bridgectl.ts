@@ -86,7 +86,7 @@ export class BridgeAppControl extends EventEmitter<BridgeAppEvents> {
 			host: address,
 			running: () => this.reporting(),
 			catalogue: () => this.catalogue,
-			press: async (control) => this.press(control),
+			press: async (control, abort) => this.press(control, undefined, abort),
 			log: (level, message) => this.host.log(level, message),
 		}
 		this.client.on('status', (s, message) => this.onStatus(s, message))
@@ -132,7 +132,7 @@ export class BridgeAppControl extends EventEmitter<BridgeAppEvents> {
 
 	actions(): ReturnType<typeof buildControlActions> {
 		return {
-			...(this.catalogue ? buildControlActions(this.catalogue, async (c, v) => this.press(c, v)) : {}),
+			...(this.catalogue ? buildControlActions(this.catalogue, async (c, v, abort) => this.press(c, v, abort)) : {}),
 			// Always: starting the bridge app is what this is for when it isn't running.
 			...openAppActions(this.openCtx),
 		}
@@ -190,8 +190,9 @@ export class BridgeAppControl extends EventEmitter<BridgeAppEvents> {
 	}
 
 	/** A refusal is the app's own sentence (brief §2.3 rule 4) — pass it on, don't paraphrase it. */
-	private async press(control: string, value?: CmdValue): Promise<void> {
-		const r = await this.client.cmd(control, value)
+	private async press(control: string, value?: CmdValue, abort?: AbortSignal): Promise<void> {
+		const r = await this.client.cmd(control, value, abort)
+		if (r.code === 'aborted') return // Companion dropped it; nothing to report
 		if (!r.ok)
 			this.host.log(
 				'warn',

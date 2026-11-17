@@ -127,7 +127,7 @@ export class ControlAppMode {
 			host: address,
 			running: () => this.client.status === 'ok' || this.client.status === 'not_allowed',
 			catalogue: () => this.catalogue,
-			press: async (control) => this.press(control),
+			press: async (control, abort) => this.press(control, undefined, abort),
 			log: (level, message) => this.host.log(level, message),
 		}
 		this.client.on('status', (s, message) => {
@@ -231,7 +231,7 @@ export class ControlAppMode {
 		this.catalogue = cat
 		const flash = this.flash
 		this.host.setActionDefinitions({
-			...buildControlActions(cat, async (control, value) => this.press(control, value)),
+			...buildControlActions(cat, async (control, value, abort) => this.press(control, value, abort)),
 			...openAppActions(this.openCtx),
 			...(flash ? talkFlashActions(flash, this.rememberPage) : {}),
 		})
@@ -267,8 +267,9 @@ export class ControlAppMode {
 	}
 
 	/** A refusal is the app's own sentence (brief §2.3 rule 4) — pass it on, don't paraphrase it. */
-	private async press(control: string, value?: CmdValue): Promise<void> {
-		const r = await this.client.cmd(control, value)
+	private async press(control: string, value?: CmdValue, abort?: AbortSignal): Promise<void> {
+		const r = await this.client.cmd(control, value, abort)
+		if (r.code === 'aborted') return // Companion dropped it; nothing to report
 		if (!r.ok)
 			this.host.log(
 				'warn',

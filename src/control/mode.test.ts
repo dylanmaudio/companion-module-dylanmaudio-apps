@@ -177,7 +177,7 @@ describe('a Console Control connection', () => {
 		const mode = new ControlAppMode(host as never, 'cxc', '127.0.0.1', mock.port, OPTS)
 		mode.start()
 		await waitFor(() => 'ctl_cxc__go-to-marker' in host.actions, 'catalogue defined')
-		await host.actions['ctl_cxc__go-to-marker']?.callback({ options: { mode: 'set', value: 9 } } as never)
+		await host.actions['ctl_cxc__go-to-marker']?.callback({ options: { mode: 'set', value: 9 } } as never, {} as never)
 		const reason = 'Show Mode: Go to Marker is not available with no markers.'
 		await waitFor(() => host.logs.some((m) => m.includes(reason)), 'refusal logged')
 		mode.stop()
@@ -224,7 +224,7 @@ describe('while the app is not running', () => {
 		expect(host.actions.ctl_ptt__failback_mode).toBeDefined()
 		expect(host.feedbacks.st_ptt__state__is).toBeDefined()
 		expect(host.logs.some((m) => m.includes('from last time'))).toBe(true)
-		await host.actions.ctl_ptt__failback_mode?.callback({ options: { value: 'latch' } } as never)
+		await host.actions.ctl_ptt__failback_mode?.callback({ options: { value: 'latch' } } as never, {} as never)
 		expect(host.logs.at(-1)).toMatch(/^Pilot Tone Trigger isn't answering/)
 		mode.stop()
 	})
