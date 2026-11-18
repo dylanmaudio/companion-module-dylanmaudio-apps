@@ -11,6 +11,7 @@
 		"url": "git+https://github.com/bitfocus/companion-module-dylanmaudio-apps.git"
 	},
 	"scripts": {
+		"postinstall": "husky",
 		"format": "prettier -w .",
 		"package": "run build && companion-module-build",
 		"build": "rimraf dist && run build:main",
@@ -30,8 +31,10 @@
 	},
 	"devDependencies": {
 		"@companion-module/tools": "^3.1.0",
-		"@types/node": "^22.19.17",
+		"@types/node": "^26.6.4",
 		"eslint": "^10.2.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^17.6.0",
 		"prettier": "^3.8.3",
 		"rimraf": "^6.1.3",
 		"typescript": "~6.0.3",
@@ -39,5 +42,13 @@
 		"vitest": "^4.1.11"
 	},
 	"prettier": "@companion-module/tools/.prettierrc.json",
+	"lint-staged": {
+		"*.{css,json,md,scss}": [
+			"prettier --write"
+		],
+		"*.{ts,tsx,js,jsx}": [
+			"yarn lint:raw --fix"
+		]
+	},
 	"packageManager": "yarn@4.17.0"
 }
