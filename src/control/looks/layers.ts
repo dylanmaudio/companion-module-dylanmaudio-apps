@@ -92,6 +92,14 @@ export function layered(name: string, elements: Json[], feedbacks: Json[], steps
 export const MIN_TEXT = 14
 
 /**
+ * A mark's size, as Companion wants it: percent of its own box, from the
+ * share of the key it should fill. `fitSize` can't do this — it sizes a word
+ * to fit across the key and caps at 26%, where a mark is one character meant
+ * to be read from the back of a room.
+ */
+export const markSize = (ofKey: number, boxHeight: number): number => Math.round((ofKey * 120) / boxHeight)
+
+/**
  * The size (percent of its box) at which a label's longest line still fits
  * across the key and its lines fit down it. Companion breaks a word that
  * doesn't fit ("PLA Y") rather than shrinking it, so labels are sized to fit;

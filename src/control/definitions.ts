@@ -27,7 +27,7 @@ import type { ActionsSchema } from '../actions.js'
 import type { FeedbacksSchema } from '../feedbacks.js'
 import type { ModuleSchema } from '../main.js'
 import type { VariablesSchema } from '../variables.js'
-import { KEY_LOOKS, keyLabel, type KeyLook } from './looks/labels.js'
+import { KEY_LOOKS, keyLabel, type KeyLook, type Mark } from './looks/labels.js'
 import * as L from './looks/layers.js'
 import { GROUP_TINT, KEY, PALETTE } from './looks/palette.js'
 import type { Catalogue, CmdValue, ControlDef, StateKeyDef, StateValue } from './types.js'
@@ -337,9 +337,26 @@ function isCritical(c: ControlDef, value?: string): boolean {
 	return value === undefined ? Object.values(c.safety).includes('critical') : c.safety[value] === 'critical'
 }
 
+/** A marked key's two boxes: the mark above, the word beneath it. */
+const MARK_H = 56
+const MARK_OF_KEY = 42
+const WORD_BOX = { x: 0, y: 62, w: 100, h: 34 }
+/**
+ * The word under a mark is a caption, not the key's voice. Left to fitSize a
+ * short one like "REC" takes the full 26% of the key it allows and ends up
+ * the same size as the mark, which reads as a word with a picture stuck on
+ * it; a two-line one is already about 15% because fitSize divides by lines.
+ * Capping at 15 makes a row of marked keys one size whatever their words.
+ */
+const WORD_CAP = L.markSize(15, WORD_BOX.h)
+
 /**
  * A control's key: its short label in white on its menu's tint, with a red
  * bar across the top when the app treats the control as show-critical.
+ *
+ * A control whose look carries a mark puts that above the word instead of
+ * centring the word alone. The mark is an element of its own, `mark`, so a
+ * feedback can recolour it the same way it recolours `label`.
  */
 function controlKey(
 	name: string,
@@ -348,15 +365,30 @@ function controlKey(
 	critical: boolean,
 	feedbacks: L.Json[],
 	steps: L.Json[],
+	mark?: Mark,
 ): L.Preset {
+	const top = critical ? 8 : 0
 	const area = critical ? { ...L.FULL, y: 8, h: 92 } : L.FULL
+	const body: L.Json[] = mark
+		? [
+				L.text(
+					'mark',
+					mark.char,
+					{ x: 0, y: top, w: 100, h: MARK_H },
+					{
+						fontsize: L.markSize(MARK_OF_KEY * (mark.scale ?? 1), MARK_H),
+						color: PALETTE.white,
+					},
+				),
+				L.text('label', label, WORD_BOX, {
+					fontsize: Math.min(L.fitSize(label, WORD_BOX.h), WORD_CAP),
+					color: PALETTE.white,
+				}),
+			]
+		: [L.text('label', label, area, { fontsize: L.fitSize(label, area.h), color: PALETTE.white })]
 	return L.layered(
 		name,
-		[
-			L.box('bg', bg),
-			...(critical ? [L.box('critical', KEY.critical, { ...L.FULL, h: 8 })] : []),
-			L.text('label', label, area, { fontsize: L.fitSize(label, area.h), color: PALETTE.white }),
-		],
+		[L.box('bg', bg), ...(critical ? [L.box('critical', KEY.critical, { ...L.FULL, h: 8 })] : []), ...body],
 		feedbacks,
 		steps,
 	)
@@ -444,6 +476,7 @@ export function buildControlPresets(
 						isCritical(c),
 						[...whenOn(c.enabled_when, KEY.attention), ...lights(look)],
 						L.press(aid),
+						look?.glyph,
 					),
 				)
 				break
@@ -457,6 +490,7 @@ export function buildControlPresets(
 						isCritical(c),
 						[...whenOn(c.state, look?.on ?? KEY.on), ...lights(look)],
 						L.press(aid, { mode: 'toggle' }),
+						look?.glyph,
 					),
 				)
 				break
@@ -476,6 +510,7 @@ export function buildControlPresets(
 							isCritical(c, value),
 							[...chosen, ...lights(v)],
 							L.press(aid, { value }),
+							v?.glyph,
 						),
 					)
 				}

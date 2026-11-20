@@ -8,6 +8,21 @@
   output is muted, not the green a toggle's own state would give it, and it
   carries the show-critical bar, because un-muting is the half that can
   surprise a room.
+- **The transport keys carry a mark, not just a word.** Record, stop, play,
+  to start, previous and next now draw ⏺ ■ ▶ ⏮ ⏪ ⏩ above their label, and the
+  state keys an operator hunts for in a dark venue carry one too: mute, panic,
+  chase, lock, undo and redo. The marks are text, drawn from Companion's own
+  symbol fonts, so they add nothing to the module's size and a feedback
+  recolours a mark exactly as it recolours a label — one REC key goes red
+  while it records, rather than needing a picture per state. Nothing is marked
+  that a mark would not help: a name, a value or a mode stays a word, because
+  if every key is a picture the transport has nothing to stand out against.
+  `tools/glyph-check.mjs` renders each mark through Companion's own canvas and
+  fonts and records what came back, and the suite holds the table to that
+  record — a mark that would arrive on a key as a missing-glyph box, or in the
+  emoji font's own colours where a feedback could not light it, fails here
+  instead of in a show.
+
 - **Each app's key wears the app's own colour, as the app reports it.** The
   identity key — the logo that opens the app — is painted from the `brand`
   block in `/ctl/v1/info`, so a colour the apps re-pick reaches Companion

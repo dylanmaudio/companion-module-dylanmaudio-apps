@@ -1,0 +1,96 @@
+{
+	"note": "Written by tools/glyph-check.mjs. Each mark as Companion itself draws it. Do not hand-edit.",
+	"companion": "5.1.0",
+	"glyphs": {
+		"record": {
+			"codepoint": "U+23FA",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"play": {
+			"codepoint": "U+25B6",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"stop": {
+			"codepoint": "U+25A0",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"toStart": {
+			"codepoint": "U+23EE",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"prev": {
+			"codepoint": "U+23EA",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"next": {
+			"codepoint": "U+23E9",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"marker": {
+			"codepoint": "U+25C6",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"mute": {
+			"codepoint": "U+1F507",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"lock": {
+			"codepoint": "U+1F512",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"unlock": {
+			"codepoint": "U+1F513",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"warning": {
+			"codepoint": "U+26A0",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"reset": {
+			"codepoint": "U+27F2",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"loop": {
+			"codepoint": "U+21BB",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"undo": {
+			"codepoint": "U+21B6",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		},
+		"redo": {
+			"codepoint": "U+21B7",
+			"drawn": true,
+			"mono": true,
+			"needsEmoji": false
+		}
+	}
+}
