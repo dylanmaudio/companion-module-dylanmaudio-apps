@@ -12,6 +12,7 @@ export const CONTROL_APPS = {
 	ptt: { name: 'Pilot Tone Trigger', port: 8772 },
 	tct: { name: 'Time Code Tool', port: 8773 },
 	cxc: { name: 'Console Control', port: 8774 },
+	sr: { name: 'Show Recorder', port: 8775 },
 } as const
 
 export type AppId = keyof typeof CONTROL_APPS

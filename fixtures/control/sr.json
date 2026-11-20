@@ -1,0 +1,427 @@
+{
+  "schema": "dylanmaudio-control-fixtures/1",
+  "source": "docs/brief-companion-control.md §4; #139 (operator, 9 Oct 2026); server apps/show-recorder/app/remote.py build()",
+  "note": "Show Recorder's real Companion control catalogue, same replay contract as fixtures/control/exchanges.json. apps/show-recorder/tests/test_remote.py asserts the live ControlServer's catalogue and initial state equal 'catalogue'/'initial_state' below verbatim and replays every case on a free port against a recording fake Api. Never edit a case to make a test green — change the brief first, then both sides.",
+  "app": {
+    "id": "sr",
+    "name": "Show Recorder",
+    "version": "<str>"
+  },
+  "catalogue": {
+    "controls": [
+      {
+        "id": "sr.record",
+        "label": "Record",
+        "kind": "action",
+        "group": "transport"
+      },
+      {
+        "id": "sr.stop",
+        "label": "Stop (stops a take)",
+        "kind": "action",
+        "group": "transport",
+        "safety": "critical"
+      },
+      {
+        "id": "sr.play_stop",
+        "label": "Play / Stop playback",
+        "kind": "action",
+        "group": "transport"
+      },
+      {
+        "id": "sr.start",
+        "label": "Go to start",
+        "kind": "action",
+        "group": "transport"
+      },
+      {
+        "id": "sr.marker",
+        "label": "Add marker",
+        "kind": "text",
+        "pattern": ".{0,64}",
+        "group": "markers"
+      },
+      {
+        "id": "sr.go_marker",
+        "label": "Go to marker",
+        "kind": "number",
+        "min": 1,
+        "step": 1,
+        "group": "markers"
+      },
+      {
+        "id": "sr.prev",
+        "label": "Previous marker or region",
+        "kind": "action",
+        "group": "markers"
+      },
+      {
+        "id": "sr.next",
+        "label": "Next marker or region",
+        "kind": "action",
+        "group": "markers"
+      },
+      {
+        "id": "sr.reset_dropouts",
+        "label": "Reset the dropout counter",
+        "kind": "action",
+        "group": "app"
+      },
+      {
+        "id": "sr.show",
+        "label": "Show window",
+        "kind": "action",
+        "group": "app"
+      }
+    ],
+    "state": [
+      {
+        "key": "sr.transport",
+        "label": "Transport",
+        "type": "enum",
+        "values": [
+          "stopped",
+          "playing",
+          "recording"
+        ]
+      },
+      {
+        "key": "sr.time",
+        "label": "Time",
+        "type": "string",
+        "max_rate_hz": 10.0
+      },
+      {
+        "key": "sr.take",
+        "label": "Take number",
+        "type": "number"
+      },
+      {
+        "key": "sr.armed",
+        "label": "Tracks armed",
+        "type": "number"
+      },
+      {
+        "key": "sr.dropouts",
+        "label": "Dropouts",
+        "type": "number"
+      },
+      {
+        "key": "sr.disk_left",
+        "label": "Recording time left",
+        "type": "string"
+      },
+      {
+        "key": "sr.disk_warning",
+        "label": "Disk warning",
+        "type": "bool"
+      },
+      {
+        "key": "sr.session",
+        "label": "Session",
+        "type": "string"
+      },
+      {
+        "key": "sr.dirty",
+        "label": "Unsaved changes",
+        "type": "bool"
+      }
+    ]
+  },
+  "initial_state": {
+    "sr.transport": "stopped",
+    "sr.time": "00:00:00",
+    "sr.take": 0,
+    "sr.armed": 0,
+    "sr.dropouts": 0,
+    "sr.disk_left": "",
+    "sr.disk_warning": false,
+    "sr.session": "",
+    "sr.dirty": false
+  },
+  "cases": [
+    {
+      "id": "info.ok",
+      "request": {
+        "method": "GET",
+        "path": "/ctl/v1/info"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ctl": 1,
+          "app": "sr",
+          "name": "Show Recorder",
+          "version": "<str>",
+          "catalogue_hash": "<str>",
+          "allowed": true,
+          "locked": false,
+          "seq": "<int>"
+        }
+      }
+    },
+    {
+      "id": "state.ok",
+      "request": {
+        "method": "GET",
+        "path": "/ctl/v1/state"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "seq": "<int>",
+          "values": {
+            "sr.transport": "stopped",
+            "sr.time": "00:00:00",
+            "sr.take": 0,
+            "sr.armed": 0,
+            "sr.dropouts": 0,
+            "sr.disk_left": "",
+            "sr.disk_warning": false,
+            "sr.session": "",
+            "sr.dirty": false
+          }
+        }
+      }
+    },
+    {
+      "id": "cmd.record",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k1",
+          "control": "sr.record"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ok": true,
+          "cid": "k1",
+          "control": "sr.record",
+          "value": null
+        }
+      },
+      "calls": [
+        [
+          "record"
+        ]
+      ]
+    },
+    {
+      "id": "cmd.stop",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k2",
+          "control": "sr.stop"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ok": true,
+          "cid": "k2",
+          "control": "sr.stop",
+          "value": null
+        }
+      },
+      "calls": [
+        [
+          "stop_transport"
+        ]
+      ]
+    },
+    {
+      "id": "cmd.stop.locked",
+      "setup": {
+        "locked": true
+      },
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k3",
+          "control": "sr.stop"
+        }
+      },
+      "response": {
+        "status": 423,
+        "body": {
+          "ok": false,
+          "cid": "k3",
+          "error": {
+            "code": "locked"
+          }
+        }
+      },
+      "calls": [],
+      "note": "Stopping a take is the one show-critical control: a stray press must not end the show's recording."
+    },
+    {
+      "id": "cmd.record.while_locked",
+      "setup": {
+        "locked": true
+      },
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k4",
+          "control": "sr.record"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ok": true,
+          "cid": "k4",
+          "control": "sr.record"
+        }
+      },
+      "calls": [
+        [
+          "record"
+        ]
+      ],
+      "note": "Starting a take never loses anything, so the lock leaves Record alone."
+    },
+    {
+      "id": "cmd.marker.named",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k5",
+          "control": "sr.marker",
+          "value": "Encore"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ok": true,
+          "cid": "k5",
+          "control": "sr.marker",
+          "value": "Encore"
+        }
+      },
+      "calls": [
+        [
+          "add_marker",
+          0.0,
+          "Encore"
+        ]
+      ]
+    },
+    {
+      "id": "cmd.go_marker.bad_value",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k6",
+          "control": "sr.go_marker",
+          "value": "two"
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "ok": false,
+          "error": {
+            "code": "bad_value"
+          }
+        }
+      },
+      "calls": []
+    },
+    {
+      "id": "cmd.go_marker.none",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k7",
+          "control": "sr.go_marker",
+          "value": 3
+        }
+      },
+      "response": {
+        "status": 409,
+        "body": {
+          "ok": false,
+          "cid": "k7",
+          "error": {
+            "code": "refused"
+          }
+        }
+      },
+      "calls": [],
+      "note": "The session has no markers: refused in the app's words."
+    },
+    {
+      "id": "cmd.not_allowed",
+      "setup": {
+        "allowed": false
+      },
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k8",
+          "control": "sr.record"
+        }
+      },
+      "response": {
+        "status": 403,
+        "body": {
+          "ok": false,
+          "error": {
+            "code": "not_allowed"
+          }
+        }
+      },
+      "calls": []
+    },
+    {
+      "id": "cmd.unknown_control",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k9",
+          "control": "sr.export"
+        }
+      },
+      "response": {
+        "status": 404,
+        "body": {
+          "ok": false,
+          "error": {
+            "code": "unknown_control"
+          }
+        }
+      },
+      "calls": [],
+      "note": "Export opens a dialog and is deliberately not a control."
+    }
+  ]
+}

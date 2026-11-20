@@ -11,7 +11,7 @@ import { KEY_LOOKS, keyLabel } from './labels.js'
 import { KEY } from './palette.js'
 
 type Json = Record<string, any>
-const APPS: AppId[] = ['bridge', 'tlt', 'ptt', 'tct', 'cxc']
+const APPS: AppId[] = ['bridge', 'tlt', 'ptt', 'tct', 'cxc', 'sr']
 const catOf = (app: AppId): Catalogue => {
 	const fx = load(`${app}.json`)
 	return { app: fx.app.id, name: fx.app.name, version: 'x', hash: 'h', ...fx.catalogue } as Catalogue
@@ -44,7 +44,7 @@ describe('control presets', () => {
 			}
 	})
 
-	it('every control the five apps offer has a label written for the key, and none is left over', () => {
+	it('every control the six apps offer has a label written for the key, and none is left over', () => {
 		const known = new Set<string>()
 		for (const app of APPS) {
 			const cat = catOf(app)
