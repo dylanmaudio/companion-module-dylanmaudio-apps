@@ -1,15 +1,15 @@
 # dylanmaudio apps
 
-One module, five apps, one connection per app: **Console Bridge**, **Talk
-Light Trigger**, **Pilot Tone Trigger**, **Time Code Tool** and **Console
-Control**. Console Bridge was called **MIDI Bridge** before version 1.5.0;
+One module, six apps, one connection per app: **Console Bridge**, **Talk
+Light Trigger**, **Pilot Tone Trigger**, **Time Code Tool**, **Console
+Control** and **Show Recorder**. Console Bridge was called **MIDI Bridge** before version 1.5.0;
 it is the same app, and this connection works with either. Pick the app in the connection's
 settings. Through Console Bridge you control an Allen & Heath dLive **and
 see what it is doing**: mutes, fader levels, names, colours and the
 current scene come back from the desk and drive feedbacks, variables and
-self-labelling presets. The other four apps expose their own controls
-(run/stop, thresholds, modes, the timecode readout) with live state on
-the keys.
+self-labelling presets. The other five apps expose their own controls
+(run/stop, thresholds, modes, the timecode readout, recording and markers)
+with live state on the keys.
 
 ## What this module is
 
@@ -62,7 +62,7 @@ as before.
 ## Other dylanmaudio apps
 
 The same module also controls **Talk Light Trigger**, **Pilot Tone
-Trigger**, **Time Code Tool** and **Console Control**. Add one connection
+Trigger**, **Time Code Tool**, **Console Control** and **Show Recorder**. Add one connection
 per app and choose it under **App**; each app must be running on this Mac
 with **Allow Companion control** switched on in its popover.
 
@@ -72,15 +72,16 @@ or choice becomes a feedback, and every value it shows becomes a variable,
 with ready-made presets. A feature added to an app in an update appears
 here without a new version of this module.
 
-- **Name the connection after the app** — `ptt`, `tlt`, `tct` — because the
+- **Name the connection after the app** — `ptt`, `tlt`, `tct`, `sr` — because the
   label is the variable prefix: `$(ptt:state)`, `$(tct:timecode)`.
 - **Port 0** uses the app's standard port (Talk Light 8771, Pilot Tone
-  8772, Time Code Tool 8773, Console Control 8774).
+  8772, Time Code Tool 8773, Console Control 8774, Show Recorder 8775).
 - **Leave the App token empty.** The apps accept connections from their
   own Mac only, for now; the field is for the LAN access they will grow.
 - **Show-critical controls** — stopping an app, changing Pilot Tone's
-  failback mode — are refused while the app's _Lock show-critical
-  controls_ switch is on. The action says so in its description.
+  failback mode, stopping a Show Recorder take or un-muting its Master
+  Out — are refused while the app's _Lock show-critical controls_ switch
+  is on. The action says so in its description.
 - **When an app says no**, its own reason goes to the Companion log word
   for word — "Signal is still below threshold — stay on backup".
 - **When an app isn't running**, its buttons stay put: the connection
@@ -88,18 +89,25 @@ here without a new version of this module.
   log that the app isn't answering.
 - **The presets read at a glance.** Each key has a short label sized to fit
   whole, like PLAY, TO START or CUE UNITY. It sits on its menu's colour, with a
-  red bar across the top when the control is show-critical. A key lights:
+  red bar across the top when the control is show-critical. Transport keys
+  and the keys you hunt for in the dark carry a mark above the word —
+  ⏺ ■ ▶ ⏮ ⏪ ⏩, mute, panic, lock, undo and redo — drawn in Companion's own
+  symbol font, so a mark lights with its key like any label. A key lights:
   - **green** while its switch is on;
   - **blue** for the chosen option (Pilot Tone's Latch in its amber);
   - **amber** when it needs a look: Reset available, record armed, unsaved
     changes, the console out of step with the timeline.
 
-  Console Control's REC turns red while it records. A control an app adds
-  later gets a short label made from its name.
+  Console Control's and Show Recorder's REC turn red while they record,
+  and their PLAY green while they play. A muted output — Show Recorder's
+  Master Out, Console Control's reference out — is a red key, never a
+  toggle's green. A control an app adds later gets a short label made from
+  its name.
 
 - **Styled keys.** Each app also has a _styled keys_ preset section, in
   the app's own look:
-  - its **logo** and its **menu-bar icon** (mirroring every state, with
+  - its **logo**, on the app's own colour as the app reports it, and its
+    **menu-bar icon** (mirroring every state, with
     Console Bridge's activity flash). Pressing either brings the app to the
     front; if it isn't running, the log says to start it;
   - a round **Run** button that fills green while the app runs;
@@ -112,6 +120,12 @@ here without a new version of this module.
   category (Transport, Console, Cue, Navigate, Track, Edit, Markers, …),
   one key per keyboard shortcut. In Show Mode, edits are refused with the
   app's own "Locked in Show Mode."
+- **Show Recorder**'s keys cover the transport (record, stop, play, to
+  start), markers (add, go to, previous, next), resetting the dropout
+  counter and its Master Out mute. What it reports becomes variables:
+  `$(sr:transport)`, `$(sr:time)`, `$(sr:take)` (the take being recorded,
+  or the last one after Stop), `$(sr:dropouts)`, `$(sr:disk_left)` and the
+  session's name and saved state.
 - **Time Code Tool** also has a four-key **timecode readout** preset
   (hours, minutes, seconds, frames). The digits are zero-padded, green
   while locked or generating, amber in freewheel, and `--` without a
