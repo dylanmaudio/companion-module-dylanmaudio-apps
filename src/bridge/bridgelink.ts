@@ -265,6 +265,13 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	private retryTimer: NodeJS.Timeout | null = null
 	private generation = 0
 	private unsupportedOps = new Set<string>()
+	/**
+	 * cid -> op, for commands the bridge answered `pending: true` (spec §9: a
+	 * fade or a query). Their real answer is an ack on the stream, which is
+	 * the only place a failure is ever stated, so the log line needs to know
+	 * what it was. Capped: an ack that never comes must not grow this forever.
+	 */
+	private pendingOps = new Map<string, string>()
 	public stats = { cmdsSent: 0, cmdsFailed: 0, deltas: 0, resyncs: 0 }
 
 	constructor(private readonly opts: BridgeLinkOptions) {
@@ -310,6 +317,8 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			void this.http('DELETE', `/api/v1/lane/${this.laneId}`).catch(() => undefined)
 			this.laneId = null
 		}
+		// Whatever was mid-ramp ends with the session, and its ack will never come.
+		this.pendingOps.clear()
 		this.setStatus('disconnected', undefined)
 	}
 
@@ -580,6 +589,15 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 				// with nothing in the log at all.
 				this.stats.cmdsFailed++
 				this.emit('log', 'warn', `Bridge rejected ${op}: HTTP ${status}`)
+			} else if (json.pending === true) {
+				// Accepted but not finished: the ramp is running, or the Gets are
+				// out. Its real answer is an ack on the stream, so remember which
+				// op this cid was for — the ack carries neither.
+				if (this.pendingOps.size >= 64) {
+					const oldest = this.pendingOps.keys().next().value
+					if (oldest !== undefined) this.pendingOps.delete(oldest)
+				}
+				this.pendingOps.set(cid, op)
 			}
 		} catch (e) {
 			this.stats.cmdsFailed++
@@ -999,9 +1017,21 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 				return
 			}
 			case 'ack': {
+				const cid = typeof payload.cid === 'string' || typeof payload.cid === 'number' ? String(payload.cid) : ''
+				const op = this.pendingOps.get(cid) ?? 'command'
+				this.pendingOps.delete(cid)
 				if (payload.ok === false) {
-					const err = (payload.error ?? {}) as { code?: string }
-					this.emit('log', 'debug', `ack ${String(payload.cid)}: ${err.code ?? 'error'}`)
+					const err = (payload.error ?? {}) as { code?: string; message?: string }
+					const code = err.code ?? 'error'
+					const why = err.message ? ` (${err.message})` : ''
+					// A stopped fade is not a failure: #522 has both a write to that
+					// fader and a second fade on it end the first one and say so, so
+					// warning about it would warn about the operator's own next press.
+					// Everything else — console_down, query_timeout, wrong_console —
+					// is work that didn't happen, and this ack is the only place it is
+					// ever said: the POST itself answered 200 pending.
+					if (code === 'fade_stopped') this.emit('log', 'info', `${op} stopped${why}`)
+					else this.emit('log', 'warn', `${op} didn't finish: ${code}${why}`)
 				}
 				return
 			}

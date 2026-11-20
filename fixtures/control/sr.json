@@ -72,6 +72,16 @@
         "label": "Show window",
         "kind": "action",
         "group": "app"
+      },
+      {
+        "id": "sr.master_out_mute",
+        "label": "Mute Master Out",
+        "kind": "toggle",
+        "state": "sr.master_out_muted",
+        "safety": {
+          "off": "critical"
+        },
+        "group": "outputs"
       }
     ],
     "state": [
@@ -125,6 +135,11 @@
         "key": "sr.dirty",
         "label": "Unsaved changes",
         "type": "bool"
+      },
+      {
+        "key": "sr.master_out_muted",
+        "label": "Master Out muted",
+        "type": "bool"
       }
     ]
   },
@@ -137,7 +152,8 @@
     "sr.disk_left": "",
     "sr.disk_warning": false,
     "sr.session": "",
-    "sr.dirty": false
+    "sr.dirty": false,
+    "sr.master_out_muted": false
   },
   "cases": [
     {
@@ -157,6 +173,10 @@
           "catalogue_hash": "<str>",
           "allowed": true,
           "locked": false,
+          "brand": {
+            "main": {"bg": "#ea3c43", "text": "#ffffff"},
+            "deep": {"bg": "#882529", "text": "#ffffff"}
+          },
           "seq": "<int>"
         }
       }

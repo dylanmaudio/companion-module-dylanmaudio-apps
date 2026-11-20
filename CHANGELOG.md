@@ -2,6 +2,22 @@
 
 ## Unreleased (1.1.9x test line, not for the store)
 
+- **Show Recorder is the sixth app** (port 8775), built from its own control
+  catalogue like the other four: transport, markers, dropout reset, takes and
+  the session's state on the keys. Its Master Out mute is a red key while the
+  output is muted, not the green a toggle's own state would give it, and it
+  carries the show-critical bar, because un-muting is the half that can
+  surprise a room.
+- **A fade that didn't land now says so.** A fade and a cold sync's Gets are
+  accepted rather than finished — the bridge answers "pending" and states the
+  outcome once, in an ack on the stream (#602). Every failed ack went to the
+  log at debug, which Companion doesn't show by default, so a fade the desk
+  never ran read exactly like one that worked: no line, no status, the fader
+  simply where it was. Those now warn and name the op, which the ack itself
+  doesn't carry. The one that doesn't warn is a fade stopped by your own next
+  write to that fader, or by a second fade on it: that is what those presses
+  mean, and it logs at info instead of crying wolf.
+
 - **A desk the bridge verifies while you are connected now works** without
   reconnecting. MIDI Bridge re-sends its console block whenever it changes,
   and the module was reading it only at connect — so on a console the bridge

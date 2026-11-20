@@ -98,6 +98,9 @@ const looks: [string, KeyLook][] = [
 	['sr.prev', { text: 'PREV\nMARKER' }],
 	['sr.next', { text: 'NEXT\nMARKER' }],
 	['sr.reset_dropouts', { text: 'RESET\nDROPOUTS' }],
+	// Its own state lights it, and a muted master output is a red key, never the
+	// toggle's green. "MASTER OUT" on one line is wider than the key allows.
+	['sr.master_out_mute', { text: 'MASTER\nMUTE', on: KEY.alarm }],
 
 	['cxc.play', { text: 'PLAY', lit: [{ key: TRANSPORT, value: 'playing', bg: KEY.on }] }],
 	['cxc.stop', { text: 'STOP' }],

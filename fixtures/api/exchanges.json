@@ -1,7 +1,7 @@
 {
   "schema": "dlive-api-fixtures/1",
   "source": "docs/bridge-client-api-v1.md (accepted 2026-08-25; amended 2026-09-07, spec 1a: broadcast-driven mirror 1.2)",
-  "note": "Authority for the Client API wire shapes, BOTH sides: the monorepo server replays requests and asserts responses; the Companion module mocks the server from the same file (vendored by tools/sync_fixtures.sh, monorepo -> module repo — the REVERSE of the protocol fixtures). Matching rules: response bodies are SUBSET-matched (extra server keys are allowed — additive changes don't bump v1, spec §11); '<str>'/'<int>' match any value of that type; '<lane>' is substituted with the lane_id registered by the most recent hello case; a case with 'family' runs against that console's server (with 'codec': true, its codec too; with 'model', the desk has said it is that model; with 'desk', it has first heard those events from its desk, as its driver decodes them), a release build's, and its '<lane>' is the lane the last hello on that server registered; 'sends' asserts the exact console-bound hex the request must produce. A request's 'headers' and 'content_type' are sent as given (a body is sent as application/json unless 'content_type' says otherwise); an empty 'sends' asserts that nothing reached the console. Never edit a case to make a test green — change the spec first, then both sides.",
+  "note": "Authority for the Client API wire shapes, BOTH sides: the monorepo server replays requests and asserts responses; the Companion module mocks the server from the same file (vendored by tools/sync_fixtures.sh, monorepo -> module repo — the REVERSE of the protocol fixtures). Matching rules: response bodies are SUBSET-matched (extra server keys are allowed — additive changes don't bump v1, spec §11); '<str>'/'<int>' match any value of that type; '<lane>' is substituted with the lane_id registered by the most recent hello case; a case with 'family' runs against that console's server (with 'codec': true, its codec too; with 'model', the desk has said it is that model; with 'desk', it has first heard those events from its desk, as its driver decodes them), a release build's, and its '<lane>' is the lane the last hello on that server registered; 'sends' asserts the exact console-bound hex the request must produce. A request's 'headers' and 'content_type' are sent as given (a body is sent as application/json unless 'content_type' says otherwise); an empty 'sends' asserts that nothing reached the console. A case's 'acks' lists the acks the stream must carry after its request (#602): subset-matched, in any order, within 5 s, such as a fade's when it lands or stops and a query's when its Gets are answered or time out. Its 'sends' are checked once they have come. A case with 'console': 'down' runs against a dLive server whose console link is down, so every write to it fails; its '<lane>' is the lane the last hello on that server registered. Never edit a case to make a test green — change the spec first, then both sides.",
   "cases": [
     {
       "id": "info.ok",
@@ -154,6 +154,104 @@
         "ok": false, "error": {"code": "unsupported_op"}}}
     },
     {
+      "id": "cmd.fade.dlive",
+      "note": "#602. A fade (spec §9) answers 200 with pending, and its ack comes on the stream when the ramp lands. On the dLive it asks the desk where the fader is first (#519) and starts from the answer, or after about 30 ms from the level held. 'sends' holds that Get and the ramp's one write (over_ms 0; -5 dB is LV 97).",
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+                  "body": {"lane_id": "<lane>", "cid": "fx-fade1",
+                           "intent": {"op": "fade", "type": "input", "index": 5,
+                                      "to_db": -5.0, "over_ms": 0}}},
+      "response": {"status": 200, "body": {"cid": "fx-fade1", "ok": true, "pending": true}},
+      "sends": ["f0 00 00 1a 50 10 01 00 0b 05 0b 17 04 f7", "bb 63 04 bb 62 17 bb 06 61"],
+      "acks": [{"cid": "fx-fade1", "ok": true}]
+    },
+    {
+      "id": "cmd.fade.long",
+      "note": "#602: a fade still running when the next case writes to its fader.",
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+                  "body": {"lane_id": "<lane>", "cid": "fx-fade2",
+                           "intent": {"op": "fade", "type": "input", "index": 6,
+                                      "to_db": -10.0, "over_ms": 60000}}},
+      "response": {"status": 200, "body": {"cid": "fx-fade2", "ok": true, "pending": true}},
+      "sends": ["f0 00 00 1a 50 10 01 00 0b 05 0b 17 05 f7"]
+    },
+    {
+      "id": "cmd.fader.stops_fade",
+      "note": "#602 (#522, MIDI Bridge 1.5.0): a lane's write to a fader stops a fade on it, and the stopped fade's ack says so. Nothing was refused: the write is acked ok.",
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+                  "body": {"lane_id": "<lane>", "cid": "fx-fade3",
+                           "intent": {"op": "fader", "type": "input", "index": 6, "db": 0.0}}},
+      "response": {"status": 200, "body": {"cid": "fx-fade3", "ok": true}},
+      "acks": [{"cid": "fx-fade3", "ok": true},
+               {"cid": "fx-fade2", "ok": false, "error": {
+                 "code": "fade_stopped", "message": "stopped by a write to that fader"}}]
+    },
+    {
+      "id": "cmd.fade.long.second",
+      "note": "#602: a fade still running when the next case fades the same fader.",
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+                  "body": {"lane_id": "<lane>", "cid": "fx-fade4",
+                           "intent": {"op": "fade", "type": "input", "index": 8,
+                                      "to_db": -10.0, "over_ms": 60000}}},
+      "response": {"status": 200, "body": {"cid": "fx-fade4", "ok": true, "pending": true}},
+      "sends": ["f0 00 00 1a 50 10 01 00 0b 05 0b 17 07 f7"]
+    },
+    {
+      "id": "cmd.fade.replaces",
+      "note": "#602 (#522, MIDI Bridge 1.5.0): a second fade on a fader replaces the first, whose ack says it was stopped.",
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+                  "body": {"lane_id": "<lane>", "cid": "fx-fade5",
+                           "intent": {"op": "fade", "type": "input", "index": 8,
+                                      "to_db": -5.0, "over_ms": 0}}},
+      "response": {"status": 200, "body": {"cid": "fx-fade5", "ok": true, "pending": true}},
+      "acks": [{"cid": "fx-fade4", "ok": false, "error": {
+                 "code": "fade_stopped", "message": "stopped by another fade on that fader"}},
+               {"cid": "fx-fade5", "ok": true}]
+    },
+    {
+      "id": "cmd.wrong_console.family",
+      "note": "#602 (spec §1b, MIDI Bridge 1.4.96): an intent can say which console it was built for. If that isn't the console MIDI Bridge is set to, it's refused with 400 wrong_console, and nothing is sent.",
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+                  "body": {"lane_id": "<lane>", "cid": "fx-wc1",
+                           "intent": {"op": "mute", "type": "input", "index": 1,
+                                      "on": true, "family": "sq"}}},
+      "response": {"status": 400, "body": {
+        "cid": "fx-wc1", "ok": false, "error": {"code": "wrong_console"}}},
+      "sends": []
+    },
+    {
+      "id": "cmd.query.timeout",
+      "note": "#602. A query (spec §9) answers 200 with pending. Its ack comes when every Get is answered, or after 2 s with query_timeout, as here, where no desk answers.",
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+                  "body": {"lane_id": "<lane>", "cid": "fx-q1",
+                           "intent": {"op": "query", "type": "input", "index": 7,
+                                      "fields": ["name"]}}},
+      "response": {"status": 200, "body": {"cid": "fx-q1", "ok": true, "pending": true}},
+      "sends": ["f0 00 00 1a 50 10 01 00 0b 01 06 f7"],
+      "acks": [{"cid": "fx-q1", "ok": false, "error": {"code": "query_timeout"}}]
+    },
+    {
+      "id": "hello.console_down",
+      "console": "down",
+      "note": "#602: a dLive server whose console link is down, so every write to it fails. A hello still works, because it writes nothing.",
+      "request": {"method": "POST", "path": "/api/v1/hello",
+                  "body": {"v": 1, "session": "main",
+                           "name": "Fixture Lane (console down)", "kind": "companion"}},
+      "response": {"status": 200, "body": {
+        "v": 1, "session": "main", "lane_id": "<str>"}}
+    },
+    {
+      "id": "cmd.fade.console_down",
+      "console": "down",
+      "note": "#602 (#522): a fade that can't start because there's no session answers 502 console_down. Any write on a down link is refused the same way. A fade the link drops under acks the same code on the stream.",
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+                  "body": {"lane_id": "<lane>", "cid": "fx-down1",
+                           "intent": {"op": "fade", "type": "input", "index": 5,
+                                      "to_db": -5.0, "over_ms": 1000}}},
+      "response": {"status": 502, "body": {
+        "cid": "fx-down1", "ok": false, "error": {"code": "console_down"}}},
+      "sends": []
+    },
+    {
       "id": "stream.resync",
       "request": {"method": "GET", "path": "/api/v1/stream?cursor=-1"},
       "response": {"status": 409, "body": {
@@ -264,6 +362,8 @@
     {"id": "cmd.query.alt.wing", "family": "wing", "codec": true, "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-wing5", "intent": {"op": "query", "type": "input", "index": 10, "fields": ["alt"]}}}, "response": {"status": 200, "body": {"ok": true, "pending": true}}, "sends": ["2f63682f31302f696e2f7365742f616c74737263000000002c000000", "2f63682f31302f696e2f636f6e6e00002c7300002a000000"], "note": "#304: the switch and the alt source, read for an app's arm check: altsrc, and the channel's source dump that carries altgrp and altin; the answers as deltas of input.10.alt and input.10.alt_source."},
     {"id": "state.scene.current.wing", "family": "wing", "codec": true, "desk": [{"kind": "scene", "scene": 4, "name": "UP1", "via": "native"}], "request": {"method": "GET", "path": "/api/v1/state"}, "response": {"status": 200, "body": {"state": {"scene.current": {"number": 4, "name": "UP1"}}}}, "note": "Slot 13 (27 Oct): the Wing's scene report names the loaded scene (its file, from $active), and scene.current is {number, name}, an object, never a number. A `scene` event carries the same two fields, and a `delta` of path scene.current (a name the desk says after the event, or its file renamed at the same place) carries exactly this value. #342: the Companion module read it with Number(value)."},
     {"id": "state.scene.current.yamaha", "family": "yamaha", "codec": true, "model": "DM7C", "desk": [{"kind": "scene", "scene": 5, "via": "get", "scene_list": "A"}, {"kind": "scene_name", "scene": 5, "number": 2.5, "name": "HALF", "scene_list": "A"}, {"kind": "scene", "scene": 5, "via": "get", "scene_number": 2.5, "name": "HALF", "scene_list": "A"}], "request": {"method": "GET", "path": "/api/v1/state"}, "response": {"status": 200, "body": {"state": {"scene.current": {"number": 5, "name": "HALF", "scene_number": 2.5, "scene_list": "A"}}}}, "note": "#419 (15 Nov): a Yamaha already on a scene when MIDI Bridge connects. The scene watch reads its place (`sscurrent_ex`), then its number (`sscurrentt_ex`) and that number's name (`ssinfot_ex`, which says the number's place too), and the state has all three before any recall: here a DM7's DMA TEST, 2.50 HALF at place 4, so number 5 and scene_number 2.5 differ. A Yamaha recalls by number: scene_number is what to send back. The Rivage has one list, unlettered, so it carries no scene_list."},
-    {"id": "state.trigger.wing", "family": "wing", "codec": true, "desk": [{"kind": "trigger_mode", "trigger": "user:U1.1", "mode": "MIDICCP", "sends": true, "via": "native"}, {"kind": "trigger_mode", "trigger": "user:U1.2", "mode": "OFF", "sends": false, "via": "native"}], "request": {"method": "GET", "path": "/api/v1/state"}, "response": {"status": 200, "body": {"state": {"trigger.user:U1.1": {"sends": true, "mode": "MIDICCP"}, "trigger.user:U1.2": {"sends": false, "mode": "OFF"}}}}, "note": "27 Oct (DEV: ROADMAP): a desk key's assignment is state, one path per trigger: trigger.<id> = {sends, mode}, the id the `trigger` event's, verbatim, everything after the first \"trigger.\" (it may hold dots: user:U1.1). sends true means a press reaches the bridge (the Wing: MIDICCP or MIDINP); false, it doesn't (OFF, a toggle, any other mode); mode is the desk's own word. Pushed whole as a delta on change (a Wing scene stores the keys' modes: recalling one can set them OFF). Absent or null is unknown (the OSC fallback; the native session down): a client says it can't check, never treats it as safe."}
+    {"id": "state.trigger.wing", "family": "wing", "codec": true, "desk": [{"kind": "trigger_mode", "trigger": "user:U1.1", "mode": "MIDICCP", "sends": true, "via": "native"}, {"kind": "trigger_mode", "trigger": "user:U1.2", "mode": "OFF", "sends": false, "via": "native"}], "request": {"method": "GET", "path": "/api/v1/state"}, "response": {"status": 200, "body": {"state": {"trigger.user:U1.1": {"sends": true, "mode": "MIDICCP"}, "trigger.user:U1.2": {"sends": false, "mode": "OFF"}}}}, "note": "27 Oct (DEV: ROADMAP): a desk key's assignment is state, one path per trigger: trigger.<id> = {sends, mode}, the id the `trigger` event's, verbatim, everything after the first \"trigger.\" (it may hold dots: user:U1.1). sends true means a press reaches the bridge (the Wing: MIDICCP or MIDINP); false, it doesn't (OFF, a toggle, any other mode); mode is the desk's own word. Pushed whole as a delta on change (a Wing scene stores the keys' modes: recalling one can set them OFF). Absent or null is unknown (the OSC fallback; the native session down): a client says it can't check, never treats it as safe."},
+    {"id": "hello.sq.dlive_only", "family": "sq", "codec": true, "note": "#602 (spec §1b, MIDI Bridge 1.4.93): a client whose hello names no consoles is a dLive client, as every client written before the SQ is.", "request": {"method": "POST", "path": "/api/v1/hello", "body": {"v": 1, "session": "main", "name": "Fixture dLive Lane", "kind": "app"}}, "response": {"status": 200, "body": {"v": 1, "session": "main", "lane_id": "<str>"}}},
+    {"id": "cmd.mute.wrong_console.sq", "family": "sq", "codec": true, "note": "#602 (spec §1b, MIDI Bridge 1.4.93; Talk Light and Pilot Tone 1.3 send first-class recalls): on another family, a dLive client's writes are refused with 400 wrong_console and nothing is sent. Its reads stay open.", "request": {"method": "POST", "path": "/api/v1/cmd", "body": {"lane_id": "<lane>", "cid": "fx-sq-wc1", "intent": {"op": "mute", "type": "input", "index": 1, "on": true}}}, "response": {"status": 400, "body": {"cid": "fx-sq-wc1", "ok": false, "error": {"code": "wrong_console"}}}, "sends": []}
   ]
 }

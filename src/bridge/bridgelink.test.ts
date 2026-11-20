@@ -177,6 +177,13 @@ class MockBridge {
 			}
 			this.cmds.push({ body })
 			const intent = body.intent as Record<string, unknown>
+			if (intent.op === 'fade' || intent.op === 'query') {
+				// spec §9 (#602): a ramp and a set of Gets are accepted, not finished.
+				// 200 pending, and the real answer is an ack on the stream later.
+				const f = fixture(intent.op === 'fade' ? 'cmd.fade.dlive' : 'cmd.query.timeout').response
+				send(f.status, { ...f.body, cid: body.cid })
+				return
+			}
 			if (intent.op === 'send_level') {
 				// Ungated in bridge 1.1.8 (cmd.send_level.ok). The status comes from
 				// the fixture; the cid is echoed, since the link matches acks by it.
@@ -394,6 +401,88 @@ describe('BridgeLink', () => {
 		link.fadeTo({ type: 'input', index: 5 }, { lv: 0 }, 0)
 		await waitFor(() => bridge.cmds.length >= 2, 'jump')
 		expect((bridge.cmds[1].body.intent as { op: string }).op).toBe('fader')
+	})
+
+	/**
+	 * #602. A fade and a query answer 200 `pending` (cmd.fade.dlive,
+	 * cmd.query.timeout): whether they landed is stated once, in an ack on the
+	 * stream, and nowhere else. Until now every failed ack went to the log at
+	 * debug, which Companion doesn't show by default — so a fade the desk never
+	 * ran looked exactly like one that worked.
+	 */
+	describe('a pending command’s ack is where it says it failed', () => {
+		const leveled = (l: BridgeLink): [string, string][] => {
+			const out: [string, string][] = []
+			l.on('log', (lvl, m) => out.push([String(lvl), m]))
+			return out
+		}
+
+		const sendFadeAndAck = async (ack: Record<string, unknown>): Promise<[string, string][]> => {
+			const seen = leveled(link)
+			link.start()
+			await waitFor(() => link.isOk && bridge.streamOpen, 'ok + stream')
+			link.fadeTo({ type: 'input', index: 5 }, { lv: 95 }, 2000)
+			await waitFor(() => bridge.cmds.length >= 1, 'fade')
+			const cid = String(bridge.cmds[0].body.cid)
+			bridge.pushEvent('ack', { cid, ...ack })
+			return seen
+		}
+
+		it('a fade stopped by the next write is not a warning: it is what that write means', async () => {
+			// cmd.fader.stops_fade / cmd.fade.replaces: both end the running fade and
+			// its ack says fade_stopped. Warning here would warn about the operator.
+			const seen = await sendFadeAndAck({
+				ok: false,
+				error: { code: 'fade_stopped', message: 'stopped by a write to that fader' },
+			})
+			await waitFor(() => seen.some(([, m]) => m.includes('stopped')), 'the stopped line')
+			const line = seen.find(([, m]) => m.includes('stopped'))
+			expect(line?.[0]).toBe('info')
+			expect(line?.[1]).toBe('fade stopped (stopped by a write to that fader)')
+			expect(seen.some(([lvl]) => lvl === 'warn')).toBe(false)
+		})
+
+		it('a fade the console never ran warns, and names the op the ack does not carry', async () => {
+			// cmd.fade.console_down: the link dropped under a running ramp. The ack
+			// carries a cid and a code, no op — the link has to remember which cid.
+			const seen = await sendFadeAndAck({ ok: false, error: { code: 'console_down' } })
+			await waitFor(() => seen.some(([lvl]) => lvl === 'warn'), 'the warning')
+			expect(seen.find(([lvl]) => lvl === 'warn')?.[1]).toBe("fade didn't finish: console_down")
+		})
+
+		it('a query whose Gets go unanswered warns, so a stale variable has a reason', async () => {
+			// cmd.query.timeout: 2 s with no desk answering. The variables simply
+			// stay as they were, which is honest but unexplained without this.
+			// A query is the cold sync's, never a button's, so this needs a link
+			// with a strip in scope rather than link.send.
+			link.stop()
+			const cold = new BridgeLink({
+				host: '127.0.0.1',
+				port: bridge.port,
+				laneName: 'cold-ack',
+				baseChannel: 12,
+				retryMs: 50,
+				strips: [{ type: 'input', index: 7 }],
+				syncScope: 'names_state',
+			})
+			const seen = leveled(cold)
+			cold.start()
+			try {
+				await waitFor(() => queriesTo(bridge).length >= 1 && bridge.streamOpen, 'query + stream')
+				const cid = String(bridge.cmds[bridge.cmds.length - 1].body.cid)
+				bridge.pushEvent('ack', { cid, ok: false, error: { code: 'query_timeout' } })
+				await waitFor(() => seen.some(([lvl]) => lvl === 'warn'), 'the warning')
+				expect(seen.find(([lvl]) => lvl === 'warn')?.[1]).toBe("query didn't finish: query_timeout")
+			} finally {
+				cold.stop()
+			}
+		})
+
+		it('an ack that says ok says nothing at all', async () => {
+			const seen = await sendFadeAndAck({ ok: true })
+			await new Promise((r) => setTimeout(r, 50))
+			expect(seen.filter(([, m]) => m.includes('fade'))).toEqual([])
+		})
 	})
 
 	it('send level goes through on a 1.1.8 bridge, in the wire shape the fixture pins', async () => {
