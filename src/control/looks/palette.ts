@@ -125,12 +125,15 @@ const HEX6 = /^#[0-9a-f]{6}$/i
  * string from a process this module does not own.
  *
  * Which of the two to paint is settled by contrast, not taste. Measured
- * (brand.test.ts does it again on every run): the text on `main` reaches
- * only 3.8:1 for Console Control and about 4.0:1 for Pilot Tone, Time Code
- * and Show Recorder — enough for the large semibold titles their UIs put
- * there, short of the 4.5:1 AA needs for small text. A Companion key is
- * small and not bold, so a key paints `deep`, which is 4.9:1 or better for
- * every app.
+ * (brand.test.ts does it again on every run): the text each app reports for
+ * `main` reaches only 3.8:1 for Console Control and about 4.0:1 for Pilot
+ * Tone, Time Code and Show Recorder — enough for the large semibold titles
+ * their UIs put there, short of the 4.5:1 AA needs for small text. That is
+ * about the pairing, not the colour: dark text on Console Control's blue
+ * would reach 4.5:1. But the pairing is the app's to choose, and painting
+ * `main` with a text colour the app didn't pick is this module inventing a
+ * look. `deep` needs no such licence — every app's own pairing there is
+ * 4.9:1 or better — so that is what a key paints.
  */
 export function brandOf(app: AppId, reported?: Brand | null): BrandColours {
 	const fallback = APP_BRAND[app]
