@@ -8,6 +8,21 @@
   output is muted, not the green a toggle's own state would give it, and it
   carries the show-critical bar, because un-muting is the half that can
   surprise a room.
+- **Each app's key wears the app's own colour, as the app reports it.** The
+  identity key — the logo that opens the app — is painted from the `brand`
+  block in `/ctl/v1/info`, so a colour the apps re-pick reaches Companion
+  with no module change. Which of the two reported colours a key takes is
+  settled by measurement, not taste: text on `main` reaches 3.8:1 for
+  Console Control and about 4.0:1 for Pilot Tone, Time Code and Show
+  Recorder — fine behind the large semibold titles their own windows put
+  there, short of the 4.5:1 that small text needs — so a key takes `deep`,
+  which is 4.9:1 or better everywhere, and the test re-measures it. An app
+  too old to report a block, or one that reports a colour in a shape this
+  can't read, falls back to the hand-typed table field by field; that table
+  is held against every control fixture on each run, so it cannot quietly go
+  stale. The rest of the deck stays neutral: a lit key means something
+  happened, not which app it belongs to.
+
 - **A fade that didn't land now says so.** A fade and a cold sync's Gets are
   accepted rather than finished — the bridge answers "pending" and states the
   outcome once, in an ack on the stream (#602). Every failed ack went to the

@@ -19,12 +19,20 @@ export interface FxCase {
 }
 export interface Fixture {
 	app: { id: string; name: string; version: string }
+	brand?: { main: { bg: string; text: string }; deep: { bg: string; text: string } }
 	catalogue: { controls: { id: string }[]; state: { key: string }[] }
 	initial_state: Record<string, unknown>
 	cases: FxCase[]
 }
 export const load = (file: string): Fixture => JSON.parse(readFileSync(join(FIXTURE_DIR, file), 'utf8')) as Fixture
 export const FILES = readdirSync(FIXTURE_DIR).filter((f) => f.endsWith('.json'))
+
+/** The `brand` block the fixture's own GET /ctl/v1/info case carries, if any. */
+export function infoBrand(fx: Fixture): Fixture['brand'] | null {
+	const info = fx.cases.find((c) => c.request.method === 'GET' && c.request.path.endsWith('/info'))
+	const brand = info?.response.body.brand
+	return (brand as Fixture['brand']) ?? null
+}
 
 /** `<str>` / `<int>` in a fixture mean "any value of that type". */
 export const ANY_STR = '<str>'
@@ -48,6 +56,12 @@ export class CtlMock {
 	/** answer every request 401 with this message, as an app that won't take the token would */
 	refuse: string | null = null
 	/**
+	 * The app's colour, as its /info reports it. Taken from the fixture's own
+	 * /info case, so the mock says what the real app says; set it to null for
+	 * a build too old to report one.
+	 */
+	brand: Fixture['brand'] | null
+	/**
 	 * Pad /info's reply to about this many bytes. Below ~64 kB a reply fits
 	 * in one buffer and Node reuses the connection however the client leaves
 	 * it, so only a padded reply shows whether the client consumed it.
@@ -69,6 +83,7 @@ export class CtlMock {
 	constructor(readonly fx: Fixture) {
 		this.catalogue = fx.catalogue
 		this.values = { ...fx.initial_state }
+		this.brand = infoBrand(fx)
 	}
 
 	async start(): Promise<void> {
@@ -138,6 +153,7 @@ export class CtlMock {
 					catalogue_hash: this.hash,
 					allowed: this.allowed,
 					locked: this.locked,
+					...(this.brand ? { brand: this.brand } : {}),
 					seq: this.seq,
 				})
 			case 'GET /ctl/v1/catalogue':

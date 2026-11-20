@@ -14,7 +14,7 @@ import type { ModuleSchema } from '../../main.js'
 import { actionId, boolFeedbackId, enumFeedbackId, type VariableNaming } from '../definitions.js'
 import { OPEN_APP_ACTION } from '../openapp.js'
 import type { AppId } from '../registry.js'
-import type { Catalogue } from '../types.js'
+import type { Brand, Catalogue } from '../types.js'
 import { APP_LOGOS, MENUBAR_ICONS } from './images.js'
 import { APP_NAME, RUN_NAME } from './labels.js'
 import {
@@ -36,7 +36,7 @@ import {
 	type Preset,
 	type Presets,
 } from './layers.js'
-import { KEY, METER, PALETTE, PTT_TILE } from './palette.js'
+import { brandOf, KEY, METER, PALETTE, PTT_TILE } from './palette.js'
 
 const whenIs = (key: string, value: string, overrides: Override[]): Json =>
 	feedback(enumFeedbackId(key), { value }, overrides)
@@ -59,6 +59,8 @@ export function buildLookPresets(
 	cat: Catalogue | null,
 	label: string,
 	naming: VariableNaming,
+	/** the app's own colour from /info; APP_BRAND stands in when it reports none */
+	brand?: Brand | null,
 ): { section: CompanionPresetSection<ModuleSchema>; presets: Presets } {
 	const presets: Presets = {}
 	const add = (id: string, p: Preset): void => {
@@ -70,14 +72,17 @@ export function buildLookPresets(
 	const openApp = press(OPEN_APP_ACTION)
 
 	// The logo: always there, even with no catalogue — it is how the app gets started.
+	// It is also the only key that wears the app's own colour. The rest of the deck
+	// stays neutral, so a lit key means something happened rather than which app it is.
+	const colour = brandOf(app, brand).deep
 	add(
 		'logo',
 		layered(
 			`${APP_NAME[app]} logo (opens the app)`,
 			[
-				box('bg', PALETTE.window),
+				box('bg', colour.bg),
 				image('logo', APP_LOGOS[app], { x: 12, y: 4, w: 76, h: 70 }),
-				text('name', APP_NAME[app], { x: 0, y: 76, w: 100, h: 22 }),
+				text('name', APP_NAME[app], { x: 0, y: 76, w: 100, h: 22 }, { color: colour.text }),
 			],
 			[],
 			openApp,

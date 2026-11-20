@@ -193,8 +193,9 @@ export class ControlAppMode {
 		this.host.setVariableDefinitions(
 			Object.fromEntries(Object.entries(this.extraVariables()).map(([id, name]) => [id, { name }])),
 		)
-		// The logo key, at least: it is how the app gets started.
-		const look = buildLookPresets(this.app, null, this.host.label, (key) => key)
+		// The logo key, at least: it is how the app gets started. Nothing has
+		// answered yet, so its colour is APP_BRAND until /info says otherwise.
+		const look = buildLookPresets(this.app, null, this.host.label, (key) => key, this.client.info?.brand)
 		this.host.setPresetDefinitions(flash ? [look.section, TALK_FLASH_SECTION] : [look.section], {
 			...look.presets,
 			...(flash ? talkFlashPresets() : {}),
@@ -252,7 +253,7 @@ export class ControlAppMode {
 			Object.assign(built.presets, readout.presets)
 			built.sections.push(readout.section)
 		}
-		const look = buildLookPresets(this.app, cat, this.host.label, bareNaming(cat))
+		const look = buildLookPresets(this.app, cat, this.host.label, bareNaming(cat), this.client.info?.brand)
 		Object.assign(built.presets, look.presets)
 		built.sections.push(look.section)
 		this.host.setPresetDefinitions(built.sections, built.presets)

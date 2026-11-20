@@ -4,6 +4,9 @@
  * Gradients are flattened to their leading colour: a key is one fill.
  */
 
+import type { AppId } from '../registry.js'
+import type { Brand } from '../types.js'
+
 const hex = (s: string): number => parseInt(s.replace('#', ''), 16)
 
 export const PALETTE = {
@@ -85,3 +88,59 @@ export const METER = {
 		states: { key: 'tct.state', colours: { freewheel: hex('#e0a93f'), clip: hex('#e8503f') } },
 	},
 } as const
+
+/**
+ * Each app's own colour, in the shape `/ctl/v1/info` reports it. This table
+ * is the fallback, not the source: `brandOf` prefers what the app says, and
+ * only an app too old to report a `brand` block lands here. Kept honest by
+ * brand.test.ts, which holds it against every fixtures/control file — the
+ * same files the monorepo's shared/tests/test_brand.py checks against the
+ * stylesheets, so a re-pick that reaches the apps cannot sit stale here.
+ */
+export const APP_BRAND: Record<AppId, Brand> = {
+	bridge: { main: { bg: '#4db0ec', text: '#1c1a14' }, deep: { bg: '#3090c7', text: '#1c1a14' } },
+	tlt: { main: { bg: '#edd473', text: '#1c1a14' }, deep: { bg: '#cbaa51', text: '#1c1a14' } },
+	ptt: { main: { bg: '#0b8ba2', text: '#ffffff' }, deep: { bg: '#035260', text: '#ffffff' } },
+	tct: { main: { bg: '#9d5bf4', text: '#ffffff' }, deep: { bg: '#5a368d', text: '#ffffff' } },
+	cxc: { main: { bg: '#2e80f2', text: '#ffffff' }, deep: { bg: '#214a8f', text: '#ffffff' } },
+	sr: { main: { bg: '#ea3c43', text: '#ffffff' }, deep: { bg: '#882529', text: '#ffffff' } },
+}
+
+/** A swatch as Companion wants it: two 24-bit numbers. */
+export interface Swatch {
+	bg: number
+	text: number
+}
+export interface BrandColours {
+	main: Swatch
+	deep: Swatch
+}
+
+const HEX6 = /^#[0-9a-f]{6}$/i
+
+/**
+ * The app's colour for a key. The app's own `brand` wins; anything it leaves
+ * out, or writes in a shape that is not `#rrggbb`, falls back to APP_BRAND
+ * value by value — a connection should not lose its identity key to one bad
+ * string from a process this module does not own.
+ *
+ * Which of the two to paint is settled by contrast, not taste. Measured
+ * (brand.test.ts does it again on every run): the text on `main` reaches
+ * only 3.8:1 for Console Control and about 4.0:1 for Pilot Tone, Time Code
+ * and Show Recorder — enough for the large semibold titles their UIs put
+ * there, short of the 4.5:1 AA needs for small text. A Companion key is
+ * small and not bold, so a key paints `deep`, which is 4.9:1 or better for
+ * every app.
+ */
+export function brandOf(app: AppId, reported?: Brand | null): BrandColours {
+	const fallback = APP_BRAND[app]
+	const swatch = (which: 'main' | 'deep'): Swatch => {
+		const said = reported?.[which]
+		const pick = (field: 'bg' | 'text'): number => {
+			const v = said?.[field]
+			return hex(typeof v === 'string' && HEX6.test(v) ? v : fallback[which][field])
+		}
+		return { bg: pick('bg'), text: pick('text') }
+	}
+	return { main: swatch('main'), deep: swatch('deep') }
+}

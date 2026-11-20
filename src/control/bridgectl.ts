@@ -148,7 +148,7 @@ export class BridgeAppControl extends EventEmitter<BridgeAppEvents> {
 	}
 
 	presets(): ReturnType<typeof buildControlPresets> {
-		const look = buildLookPresets('bridge', this.catalogue, this.host.label, prefixedNaming)
+		const look = buildLookPresets('bridge', this.catalogue, this.host.label, prefixedNaming, this.client.info?.brand)
 		const built = this.catalogue
 			? buildControlPresets(this.catalogue, this.host.label, prefixedNaming)
 			: { sections: [], presets: {} }

@@ -52,6 +52,25 @@ export interface Catalogue {
 	state: StateKeyDef[]
 }
 
+/** A background the app paints, and the text colour it paints on it. */
+export interface BrandSwatch {
+	/** CSS hex, `#rrggbb` */
+	bg: string
+	/** CSS hex, `#rrggbb` */
+	text: string
+}
+
+/**
+ * The app's own colour, as it reports it (monorepo shared/brand.py, from
+ * each app's ui/app.css): `main` is the colour its UI paints, `deep` the
+ * darker one it uses behind small text. A Companion key takes `deep` —
+ * see looks/palette.ts `brandOf`.
+ */
+export interface Brand {
+	main: BrandSwatch
+	deep: BrandSwatch
+}
+
 export interface CtlInfo {
 	v: number
 	/** the control API version — must equal CTL_API_VERSION */
@@ -64,6 +83,11 @@ export interface CtlInfo {
 	allowed: boolean
 	/** the app's "Lock show-critical controls" switch */
 	locked: boolean
+	/**
+	 * The app's colour. Absent from builds older than the one that added it,
+	 * so every reader falls back to APP_BRAND; `ctl` does not change for it.
+	 */
+	brand?: Brand
 	seq: number
 }
 
