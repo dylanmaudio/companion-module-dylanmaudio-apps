@@ -192,7 +192,7 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 			return {
 				status: 404,
 				headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-				body: 'The show file page belongs to a MIDI Bridge connection.',
+				body: 'The show file page belongs to a Console Bridge connection.',
 			}
 		}
 		const path = (req.path ?? '/').replace(/\/+$/, '')
@@ -309,11 +309,14 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 		if (status !== 'ok' && state === 'stopped') {
 			this.updateStatus(
 				InstanceStatus.Disconnected,
-				'MIDI Bridge is stopped. Start it from its menu-bar icon, or with a Companion button.',
+				'Console Bridge is stopped. Start it from its menu-bar icon, or with a Companion button.',
 			)
 		} else if (status !== 'ok' && state === 'error') {
 			const hint = this.bridgeApp?.errorHint
-			this.updateStatus(InstanceStatus.ConnectionFailure, `MIDI Bridge stopped with an error${hint ? `: ${hint}` : ''}`)
+			this.updateStatus(
+				InstanceStatus.ConnectionFailure,
+				`Console Bridge stopped with an error${hint ? `: ${hint}` : ''}`,
+			)
 		} else {
 			this.updateStatus(STATUS_MAP[status], message)
 		}
@@ -366,7 +369,7 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 		if (!this.config.bridgeHost) {
 			this.updateStatus(
 				InstanceStatus.BadConfig,
-				'Enter the MIDI Bridge address (127.0.0.1 if it runs on this machine)',
+				'Enter the Console Bridge address (127.0.0.1 if it runs on this machine)',
 			)
 			return
 		}

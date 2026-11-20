@@ -568,7 +568,7 @@ describe('BridgeLink', () => {
 			// quiet for 300 ms, then a question that gets no answer in 200 ms
 			expect(Date.now() - t0).toBeLessThan(1500)
 			expect(statuses).toContainEqual(
-				expect.stringMatching(/^connecting Waiting for MIDI Bridge at 127\.0\.0\.1:\d+ \(stopped answering\)$/),
+				expect.stringMatching(/^connecting Waiting for Console Bridge at 127\.0\.0\.1:\d+ \(stopped answering\)$/),
 			)
 			expect(w.state.connected).toBe(false)
 			expect(changedPaths).toContain('connection')
@@ -598,7 +598,7 @@ describe('BridgeLink', () => {
 			bridge.frozen = true
 			w.send({ op: 'mute', type: 'input', index: 3, on: true })
 			await waitFor(() => !w.isOk, 'noticed', 3000)
-			expect(warns).toContain("mute didn't reach MIDI Bridge (no answer)")
+			expect(warns).toContain("mute didn't reach Console Bridge (no answer)")
 		})
 
 		it('says so when the bridge refuses the token, and asks again slowly', async () => {
@@ -610,7 +610,7 @@ describe('BridgeLink', () => {
 			w.start()
 			await waitFor(() => w.status === 'refused', 'refused')
 			expect(statuses.at(-1)?.[1]).toBe(
-				"MIDI Bridge refused this connection (Token required). Check the bridge token in this connection's settings.",
+				"Console Bridge refused this connection (Token required). Check the bridge token in this connection's settings.",
 			)
 			await new Promise((r) => setTimeout(r, 300))
 			expect(bridge.hellos.length).toBe(1)
@@ -649,7 +649,7 @@ describe('BridgeLink', () => {
 			const statuses: (string | undefined)[] = []
 			w.on('status', (_s, m) => statuses.push(m))
 			w.start()
-			expect(statuses[0]).toBe('Waiting for MIDI Bridge at [::1]:8765')
+			expect(statuses[0]).toBe('Waiting for Console Bridge at [::1]:8765')
 		})
 	})
 

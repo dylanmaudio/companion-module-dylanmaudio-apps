@@ -8,7 +8,7 @@ mutes, fader levels, names, colours and the current scene come back off
 the desk and drive feedbacks, variables and self-labelling presets. MIT.
 
 **This module does not connect to a console directly.** It attaches to
-the MIDI Bridge app (v1.1+) as a named lane over the Client API; the
+the Console Bridge app (v1.1+, called MIDI Bridge before 1.5.0) as a named lane over the Client API; the
 bridge owns the console connection, the state mirror,
 timed fades and the base channel, and every app sharing that bridge —
 a DAW, Console Control, this module — appears attributed in one MIDI
@@ -27,7 +27,7 @@ fixtures/author.py      regenerates the two JSON files from the byte templates
 src/protocol/           channels (addressing), intents, encode, decode, levels (measured dB table)
 src/state/              ConsoleState (the mirror), SubscriptionRegistry, QueryScheduler
 src/link-api.ts         LinkApi — the seam the Companion layer talks to
-src/bridge/             BridgeLink — the shipping path: a MIDI Bridge Client API v1 lane
+src/bridge/             BridgeLink — the shipping path: a Console Bridge Client API v1 lane
 fixtures/api/           Client API exchange fixtures (authored bridge-side, vendored here)
 fixtures/control/       control API exchange fixtures for the other apps (authored in the monorepo, vendored here)
 src/control/            the other apps: /ctl/v1/ client, and catalogue → actions, feedbacks, variables, presets
@@ -46,7 +46,7 @@ src/e2e.test.ts         real module + fake Companion host + real TCP to the Virt
 ```
 
 The same fixtures are vendored into the dLive Utility Apps monorepo,
-where the Python side (MIDI Bridge / Virtual dLive) must pass them too.
+where the Python side (Console Bridge / Virtual dLive) must pass them too.
 When a hardware capture contradicts a fixture, fix the fixture (with the
 capture attached) and both implementations follow.
 
@@ -69,7 +69,7 @@ Hardware-free end-to-end: `src/e2e.test.ts` spawns
 Versions **x.y.90 and up are test builds**: built from a topic branch,
 never submitted to Bitfocus, loaded by hand. The multi-console line is
 `1.1.90`+ from `topic/multi-console-apps`, and it ships as `1.2.0` once
-MIDI Bridge 1.5.0 is public. The same convention as the apps' own `.90`
+Console Bridge 1.5.0 is public. The same convention as the apps' own `.90`
 builds.
 
 To load one into Companion:
@@ -93,7 +93,7 @@ whichever version it was pointed at.
 
 `ConsoleLink` and `TcpTransport` implement the console protocol over TCP
 directly. **They are not part of the module.** `main.ts` only ever builds
-the MIDI Bridge link, and `tsconfig.build.json` leaves both files out of
+the Console Bridge link, and `tsconfig.build.json` leaves both files out of
 `dist`, so the packaged module can't open a socket to a console. They
 exist so the protocol layer can be verified end to end against the
 Virtual dLive without a console: `src/e2e.test.ts` injects them through

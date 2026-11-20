@@ -7,7 +7,7 @@
  * no discovery. LAN reach, with a token and Bonjour, is a later shared step.
  */
 export const CONTROL_APPS = {
-	bridge: { name: 'MIDI Bridge', port: 8770 },
+	bridge: { name: 'Console Bridge', port: 8770 },
 	tlt: { name: 'Talk Light Trigger', port: 8771 },
 	ptt: { name: 'Pilot Tone Trigger', port: 8772 },
 	tct: { name: 'Time Code Tool', port: 8773 },

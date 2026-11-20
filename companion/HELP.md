@@ -1,9 +1,10 @@
 # dylanmaudio apps
 
-One module, five apps, one connection per app: **MIDI Bridge**, **Talk
+One module, five apps, one connection per app: **Console Bridge**, **Talk
 Light Trigger**, **Pilot Tone Trigger**, **Time Code Tool** and **Console
-Control**. Pick the app in the connection's
-settings. Through MIDI Bridge you control an Allen & Heath dLive **and
+Control**. Console Bridge was called **MIDI Bridge** before version 1.5.0;
+it is the same app, and this connection works with either. Pick the app in the connection's
+settings. Through Console Bridge you control an Allen & Heath dLive **and
 see what it is doing**: mutes, fader levels, names, colours and the
 current scene come back from the desk and drive feedbacks, variables and
 self-labelling presets. The other four apps expose their own controls
@@ -12,8 +13,8 @@ the keys.
 
 ## What this module is
 
-The MIDI Bridge connection controls an Allen & Heath dLive **through the
-MIDI Bridge application**. The bridge owns the connection to the console;
+The Console Bridge connection controls an Allen & Heath dLive **through the
+Console Bridge application**. The bridge owns the connection to the console;
 this module attaches to it as a named lane, alongside anything else you
 have connected — a DAW, Console Control, other apps — all sharing one
 console connection and one MIDI monitor that attributes every message
@@ -26,14 +27,14 @@ means a different level on another desk, so half-driving one is worse
 than not driving it. Support for other consoles comes in a later module
 version, which will say so here.
 
-**It does not connect to a console directly.** You need the MIDI Bridge
+**It does not connect to a console directly.** You need the Console Bridge
 app (v1.1 or later) running and connected to your desk. Console address,
 base MIDI channel and reconnect behaviour are configured **in the
 bridge**, and this module inherits them.
 
 ## Setup
 
-1. In the MIDI Bridge app, connect to your console and confirm it is
+1. In the Console Bridge app, connect to your console and confirm it is
    online.
 2. On the console: **Utility → Control → MIDI**, mode **On** (not
    Secure), Global MIDI Send and Receive enabled.
@@ -44,14 +45,14 @@ bridge**, and this module inherits them.
 
 ### The bridge app's own controls
 
-With MIDI Bridge 1.1.9 or later, this connection also controls the bridge
+With the bridge app at 1.1.9 or later, this connection also controls the bridge
 app itself: **Run** (start or stop the bridge), **Restart bridge** and
 **Auto-reconnect**. Its state shows as `$(dlive:bridge_state)` (stopped ·
 not connected · connecting · connected · error), `$(dlive:bridge_running)`,
 `$(dlive:bridge_msg_rate)` and a few more, with presets under _MIDI
 Bridge_. These go to the bridge's menu-bar side on port 8770, so they
 still work while the bridge itself is stopped. The connection status then
-reads "MIDI Bridge is stopped" instead of "nothing answering".
+reads "Console Bridge is stopped" instead of "nothing answering".
 
 Turn on **Allow Companion control** in the bridge's popover. Stopping and
 restarting are refused while its _Lock show-critical controls_ switch is
@@ -99,7 +100,7 @@ here without a new version of this module.
 - **Styled keys.** Each app also has a _styled keys_ preset section, in
   the app's own look:
   - its **logo** and its **menu-bar icon** (mirroring every state, with
-    MIDI Bridge's activity flash). Pressing either brings the app to the
+    Console Bridge's activity flash). Pressing either brings the app to the
     front; if it isn't running, the log says to start it;
   - a round **Run** button that fills green while the app runs;
   - a **level meter** (Talk Light's and Pilot Tone's with the threshold marked);
@@ -135,7 +136,7 @@ the two triggers that drive it ship as one file,
    destination **[ Insert new page ]**. Under _Import Connections
    Behavior_, pick your Talk Light connection — or **[ Create new
    connection ]**, which arrives set up for Talk Light on its standard port.
-   Don't leave it linked to a MIDI Bridge connection.
+   Don't leave it linked to a Console Bridge connection.
 2. Same file, the **Triggers** tab: select both, the same connection
    choice, **Add to existing triggers**.
 3. In the Talk Light connection, set **TALK page number** to the page the
@@ -186,10 +187,10 @@ preset, and the variables `$(tlt:talk_active)`, `$(tlt:talk_flash_armed)`,
 
 | Setting                                       | Notes                                                                                                                                                                                                     |
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| App                                           | Which dylanmaudio app this connection controls. **MIDI Bridge** is the dLive console, and everything below; the others are covered above                                                                  |
+| App                                           | Which dylanmaudio app this connection controls. **Console Bridge** is the dLive console, and everything below; the others are covered above                                                               |
 | Talk flash rate / cooldown / TALK page number | Talk Light only — see _Talk flash_ above                                                                                                                                                                  |
-| MIDI Bridge address / port / token            | Where the bridge is: 127.0.0.1 : 8765, beside Companion. The bridge listens on its own Mac, so the token stays empty until it grows LAN access. It is kept as a secret, and also goes to the control port |
-| Bridge app control port                       | 0 = the standard 8770, on the same address. For Run, Restart and Auto-reconnect (MIDI Bridge 1.1.9+)                                                                                                      |
+| Console Bridge address / port / token         | Where the bridge is: 127.0.0.1 : 8765, beside Companion. The bridge listens on its own Mac, so the token stays empty until it grows LAN access. It is kept as a secret, and also goes to the control port |
+| Bridge app control port                       | 0 = the standard 8770, on the same address. For Run, Restart and Auto-reconnect (bridge app 1.1.9+)                                                                                                       |
 | Console firmware                              | Not detectable over MIDI; shown in `$(dlive:firmware)`                                                                                                                                                    |
 | Inputs in use / extended types                | Bounds the variable grid and the preset library                                                                                                                                                           |
 | Ask the console for                           | What the bridge fetches for every strip on connect, and on **Resync**. The desk announces only what _changes_, so without this a connection made mid-show shows nothing until someone moves something     |
@@ -207,7 +208,7 @@ Green means **the bridge is reachable _and_ reports its console link is
 up** — not merely that the bridge answered. If the bridge is running but
 the desk is not connected you get:
 
-> MIDI Bridge is running but its console link is down — check the bridge app
+> Console Bridge is running but its console link is down — check the bridge app
 
 and if the bridge itself is not reachable, the status stays amber with
 the address it is waiting on, and why: connection refused, no answer,
@@ -260,7 +261,7 @@ without re-exporting anything.
 
 ### On a console that is not a dLive
 
-MIDI Bridge can drive other desks, and this module follows it onto one
+Console Bridge can drive other desks, and this module follows it onto one
 only once the bridge says that family's driver has been run against a
 real desk. Until then the connection sits red and says which desk it
 found: nothing is sent, because a dLive fader value means a different
@@ -289,7 +290,7 @@ Scene recall, mutes and names work on a verified desk. Levels are held
 back until the bridge has measured that console's fader law, and the log
 says so in a sentence rather than failing quietly.
 
-A desk is "verified" the moment the MIDI Bridge says so, which can be a
+A desk is "verified" the moment the Console Bridge says so, which can be a
 moment after you connect rather than at connect: on a Yamaha the bridge
 has to ask the desk which model it is first, and the Rivage PM5 and the
 DM7 Compact are verified separately. So a connection can say it drives a
@@ -313,7 +314,7 @@ file.
 
 **Scene Go / Next / Previous, Cue-list recall and Surface CC refuse.**
 They belong on the console's second socket, the Surface (51328), and the
-MIDI Bridge has one console connection: the MixRack's. There the same
+Console Bridge has one console connection: the MixRack's. There the same
 bytes mean something else — on the Virtual dLive, "cue list: recall ID
 11" recalled **scene 12** — so the module says so in the log and sends
 nothing. Use **Scene recall**, which is a MixRack message and works.
@@ -373,7 +374,7 @@ What costs a slot:
 
 | What you run                                         | MixRack connections                                                                               |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| **This module, through MIDI Bridge**                 | **one, shared.** Console Control, a DAW and every dylanmaudio app ride the same bridge connection |
+| **This module, through Console Bridge**              | **one, shared.** Console Control, a DAW and every dylanmaudio app ride the same bridge connection |
 | A direct dLive Companion module aimed at the MixRack | one each                                                                                          |
 | `allenheath-dlive-ilive`                             | one, plus A&H's network port 51321                                                                |
 | A direct module aimed at the **Surface** (51328)     | probably none — unmeasured                                                                        |
@@ -395,17 +396,17 @@ changes nothing. On a dLive that is one client too many.
 
 **Closing something else is not enough on its own.** A stranded client
 is not picked up when a slot frees — only a fresh connection is served,
-so whatever was stranded has to reconnect. MIDI Bridge handles this for
+so whatever was stranded has to reconnect. Console Bridge handles this for
 you, because it retries every 10 s and is served within seconds of a
 slot opening. A module that connects once and waits will stay silent.
 
 **On other Allen & Heath consoles:** an SQ serves exactly **one** MIDI
 connection, so a direct SQ Companion module takes the only slot and locks
-out MIDI Bridge, Console Control and every dylanmaudio app for as long as
+out Console Bridge, Console Control and every dylanmaudio app for as long as
 it holds it. If you use the bridge on an SQ, disable Companion's own
 Allen & Heath SQ connection for that desk. (On any desk that is not a
 dLive, see "On a console that is not a dLive" above: the module follows
-MIDI Bridge onto it only once that family's driver has been verified on
+Console Bridge onto it only once that family's driver has been verified on
 a real desk.)
 
 ## Limitations (protocol, not the module)
@@ -415,7 +416,7 @@ a real desk.)
 - **No scene names over MIDI** — hence the show-file import.
 - **SoftKeys cannot be triggered by MIDI**; use a console Action instead.
 - **No cue list, and no scene Go / Next / Previous.** Those live on the
-  console's Surface socket, which the MIDI Bridge does not open.
+  console's Surface socket, which the Console Bridge does not open.
 - **Preamps are addressed by socket**, not channel; the patch is not
   readable.
 - Some "Get" queries (preamp, mix assign) are extrapolated from the

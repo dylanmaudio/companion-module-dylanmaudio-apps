@@ -736,7 +736,7 @@ export function buildActions(ctx: ModuleContext): CompanionActionDefinitions<Act
  * the wrong scene because a key said "cue".
  */
 const SURFACE_ONLY =
-	"needs the console's Surface socket, which the MIDI Bridge doesn't have. Its one console connection is the MixRack's, where these bytes recall a scene instead — so nothing was sent"
+	"needs the console's Surface socket, which Console Bridge doesn't have. Its one console connection is the MixRack's, where these bytes recall a scene instead — so nothing was sent"
 
 function refuseSurface(ctx: ModuleContext, what: string): void {
 	ctx.log('warn', `${what} ${SURFACE_ONLY}`)

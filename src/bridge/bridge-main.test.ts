@@ -214,7 +214,7 @@ describe('bridge mode through DliveInstance', () => {
 			bridgeCtlPort: ctl.port,
 			inputs: 16,
 		})
-		await waitFor(() => host.statuses.some((s) => s.includes('MIDI Bridge is stopped')), 'stopped status')
+		await waitFor(() => host.statuses.some((s) => s.includes('Console Bridge is stopped')), 'stopped status')
 		await inst.destroy()
 		await ctl.stop()
 	})

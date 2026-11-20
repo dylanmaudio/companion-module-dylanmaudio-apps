@@ -8,6 +8,20 @@
   output is muted, not the green a toggle's own state would give it, and it
   carries the show-critical bar, because un-muting is the half that can
   surprise a room.
+- **MIDI Bridge is now Console Bridge** (dylanmaudio/dLive-Utility-Apps#694).
+  The app is renamed at its 1.5.0, because it no longer speaks only MIDI —
+  OSC to the Wing and the DiGiCo SD, RCP to the Yamahas — and because the old
+  name was crowded. This module follows it in every word you see: the
+  connection's name and help, the status and log lines, the key labels, the
+  store description. For this release it says "formerly MIDI Bridge" where
+  you would go looking, and the store lists both names, so a customer still
+  running 1.4.x finds the connection they know. **Nothing you have built
+  moves**: every action and option id, the `bridge` connection type, your
+  variables and your buttons are untouched, and no upgrade script is needed.
+  Two sentences keep the old name on purpose — the ones that say Run and
+  Restart need the bridge app at 1.1.9 or later, because that version only
+  ever shipped as MIDI Bridge.
+
 - **The transport keys carry a mark, not just a word.** Record, stop, play,
   to start, previous and next now draw ⏺ ■ ▶ ⏮ ⏪ ⏩ above their label, and the
   state keys an operator hunts for in a dark venue carry one too: mute, panic,

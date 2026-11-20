@@ -175,7 +175,10 @@ export function GetConfigFields(ctx: ConfigFieldContext = {}): SomeCompanionConf
 		default: 'bridge',
 		choices: APP_IDS.map((id) => ({
 			id,
-			label: id === 'bridge' ? 'MIDI Bridge — the dLive console, with full feedback' : CONTROL_APPS[id].name,
+			label:
+				id === 'bridge'
+					? 'Console Bridge (formerly MIDI Bridge) — the dLive console, with full feedback'
+					: CONTROL_APPS[id].name,
 		})),
 	}
 	const controlFields: SomeCompanionConfigField[] = [
@@ -276,14 +279,14 @@ function bridgeFields(ctx: ConfigFieldContext): SomeCompanionConfigField[] {
 			type: 'static-text',
 			id: 'info',
 			width: 12,
-			label: 'dLive MIDI Bridge',
+			label: 'dLive Console Bridge (formerly MIDI Bridge)',
 			value:
-				'This module talks to the <b>dLive MIDI Bridge</b> application, which owns the connection to the console. Set the console address, base MIDI channel and reconnect behaviour <b>in the bridge</b> — this module inherits them. Status goes green only once the bridge reports its console link is up.',
+				'This module talks to the <b>dLive Console Bridge</b> application — called <b>MIDI Bridge</b> before version 1.5.0 — which owns the connection to the console. Set the console address, base MIDI channel and reconnect behaviour <b>in the bridge</b> — this module inherits them. Status goes green only once the bridge reports its console link is up.',
 		},
 		{
 			type: 'textinput',
 			id: 'bridgeHost',
-			label: 'MIDI Bridge address',
+			label: 'Console Bridge address',
 			tooltip: '127.0.0.1 when Companion runs on the same machine as the bridge.',
 			width: 8,
 			default: '127.0.0.1',
@@ -294,7 +297,7 @@ function bridgeFields(ctx: ConfigFieldContext): SomeCompanionConfigField[] {
 			id: 'bridgeCtlPort',
 			label: 'Bridge app control port (0 = 8770)',
 			tooltip:
-				"The MIDI Bridge app's own controls — Run, Restart, Auto-reconnect — on the address above. Needs MIDI Bridge 1.1.9 or later; an older bridge just doesn't offer them.",
+				"The bridge app's own controls — Run, Restart, Auto-reconnect — on the address above. Needs the bridge app at 1.1.9 or later; an older one just doesn't offer them.",
 			width: 4,
 			min: 0,
 			max: 65535,

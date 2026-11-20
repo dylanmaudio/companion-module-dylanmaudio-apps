@@ -219,7 +219,7 @@ function refusal(status: number, json: Record<string, unknown>): Refused | null 
 	if (status !== 401 && status !== 403) return null
 	const { code, message } = errorOf(json)
 	return new Refused(
-		`MIDI Bridge refused this connection (${message ?? code ?? `HTTP ${status}`}). Check the bridge token in this connection's settings.`,
+		`Console Bridge refused this connection (${message ?? code ?? `HTTP ${status}`}). Check the bridge token in this connection's settings.`,
 	)
 }
 
@@ -296,7 +296,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 	start(): void {
 		if (this.started) return
 		this.started = true
-		this.setStatus('connecting', `Waiting for MIDI Bridge at ${this.where}`)
+		this.setStatus('connecting', `Waiting for Console Bridge at ${this.where}`)
 		void this.runSession(++this.generation)
 	}
 
@@ -387,7 +387,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			if (this.caps.fader_db === false) {
 				this.sayOnce(
 					'fader_db',
-					`Levels aren't sent to a ${this.foreignFamily}: MIDI Bridge hasn't verified its dB law, so a dB here wouldn't land where it says.`,
+					`Levels aren't sent to a ${this.foreignFamily}: Console Bridge hasn't verified its dB law, so a dB here wouldn't land where it says.`,
 				)
 				return
 			}
@@ -609,7 +609,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			// A lost press matters, and may mean the link is down. A lost cold-sync
 			// query is asked again by the next session's cold sync.
 			if (op !== 'query') this.watchdog?.suspect()
-			this.emit('log', op === 'query' ? 'debug' : 'warn', `${op} didn't reach MIDI Bridge (${netReason(e)})`)
+			this.emit('log', op === 'query' ? 'debug' : 'warn', `${op} didn't reach Console Bridge (${netReason(e)})`)
 		}
 	}
 
@@ -659,7 +659,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 				if (e instanceof Refused) {
 					this.setStatus('refused', e.message)
 					wait = this.opts.refusedRetryMs ?? 10_000
-				} else this.setStatus('connecting', `Waiting for MIDI Bridge at ${this.where} (${netReason(e)})`)
+				} else this.setStatus('connecting', `Waiting for Console Bridge at ${this.where} (${netReason(e)})`)
 			}
 			if (!this.started || gen !== this.generation) return
 			await new Promise((r) => (this.retryTimer = setTimeout(r, wait)))
@@ -851,7 +851,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			this.emit(
 				'log',
 				'info',
-				`MIDI Bridge has verified its ${this.foreignFamily} driver on a desk, so this connection will drive it now.`,
+				`Console Bridge has verified its ${this.foreignFamily} driver on a desk, so this connection will drive it now.`,
 			)
 		}
 		this.applyConsoleState()
@@ -862,7 +862,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			// Not a transport failure: the link is fine and the desk is the wrong one.
 			this.setStatus(
 				'failure',
-				`MIDI Bridge is driving a ${this.foreignFamily}; this module version drives a dLive only`,
+				`Console Bridge is driving a ${this.foreignFamily}; this module version drives a dLive only`,
 			)
 			if (this.state.connected) {
 				this.state.connected = false
@@ -879,7 +879,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			}
 		} else {
 			const wasOk = this._status === 'ok'
-			this.setStatus('failure', `MIDI Bridge is running but its console link is ${console_} — check the bridge app`)
+			this.setStatus('failure', `Console Bridge is running but its console link is ${console_} — check the bridge app`)
 			if (wasOk) {
 				this.state.connected = false
 				this.emit('changed', [CONNECTION_PATH])
@@ -1081,7 +1081,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			this.emit(
 				'log',
 				'warn',
-				`MIDI Bridge is driving a ${family}, and this module version drives a dLive only. ` +
+				`Console Bridge is driving a ${family}, and this module version drives a dLive only. ` +
 					`Nothing is being sent to the console: a dLive fader value means a different level on a ${family}. ` +
 					`Watch for a module version that lists ${family} support.`,
 			)

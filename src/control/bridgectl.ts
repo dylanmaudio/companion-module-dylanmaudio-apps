@@ -35,9 +35,9 @@ import { CONTROL_APPS } from './registry.js'
 import type { Catalogue, CmdValue, StateValue } from './types.js'
 
 export const BRIDGE_APP_VARIABLES: Record<string, string> = {
-	bridge_app_connected: 'MIDI Bridge app control is connected',
-	bridge_app_allowed: 'Companion control is allowed in the MIDI Bridge app',
-	bridge_app_locked: 'Show-critical controls are locked in the MIDI Bridge app',
+	bridge_app_connected: 'Console Bridge app control is connected',
+	bridge_app_allowed: 'Companion control is allowed in the Console Bridge app',
+	bridge_app_locked: 'Show-critical controls are locked in the Console Bridge app',
 }
 
 export type BridgeAppHost = Pick<InstanceBase<ModuleSchema>, 'label' | 'setVariableValues' | 'checkFeedbacks'> & {
@@ -99,7 +99,7 @@ export class BridgeAppControl extends EventEmitter<BridgeAppEvents> {
 			}
 			this.host.log(
 				'info',
-				`MIDI Bridge app control: ${cat.controls.length} controls, ${cat.state.length} state values`,
+				`Console Bridge app control: ${cat.controls.length} controls, ${cat.state.length} state values`,
 			)
 			this.emit('definitions')
 		})
@@ -164,13 +164,13 @@ export class BridgeAppControl extends EventEmitter<BridgeAppEvents> {
 		this.maybeStateChanged()
 		if (s === 'connecting' || s === this.announced) return
 		this.announced = s
-		if (s === 'ok') this.host.log('info', 'MIDI Bridge app control connected: Run, Restart and Auto-reconnect')
+		if (s === 'ok') this.host.log('info', 'Console Bridge app control connected: Run, Restart and Auto-reconnect')
 		else if (s === 'not_running')
 			this.host.log(
 				'info',
-				`MIDI Bridge app control isn't answering on ${this.where}. Run, Restart and Auto-reconnect need MIDI Bridge 1.1.9 or later; console control is unaffected.`,
+				`Console Bridge app control isn't answering on ${this.where}. Run, Restart and Auto-reconnect need the bridge app at 1.1.9 or later; console control is unaffected.`,
 			)
-		else this.host.log('warn', `MIDI Bridge app control: ${message}`)
+		else this.host.log('warn', `Console Bridge app control: ${message}`)
 	}
 
 	private onValues(changed: Record<string, StateValue>): void {
@@ -196,7 +196,7 @@ export class BridgeAppControl extends EventEmitter<BridgeAppEvents> {
 		if (!r.ok)
 			this.host.log(
 				'warn',
-				r.code === 'not_running' && r.message ? r.message : `MIDI Bridge: ${r.message ?? r.code ?? 'refused'}`,
+				r.code === 'not_running' && r.message ? r.message : `Console Bridge: ${r.message ?? r.code ?? 'refused'}`,
 			)
 	}
 

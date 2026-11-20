@@ -29,7 +29,7 @@ async function closedPort(): Promise<number> {
 	return port
 }
 
-describe('MIDI Bridge app control inside the MIDI Bridge connection', () => {
+describe('Console Bridge app control inside the Console Bridge connection', () => {
 	let mock: CtlMock | null = null
 	let app: BridgeAppControl | null = null
 	afterEach(async () => {
@@ -83,7 +83,7 @@ describe('MIDI Bridge app control inside the MIDI Bridge connection', () => {
 		const host = await connect()
 		await app!.actions().ctl_bridge__run?.callback({ options: { mode: 'on' } }, {})
 		expect(mock!.requests.filter((r) => r.path === '/ctl/v1/cmd')).toHaveLength(1)
-		expect(host.logs.some((m) => m.startsWith('MIDI Bridge:'))).toBe(false)
+		expect(host.logs.some((m) => m.startsWith('Console Bridge:'))).toBe(false)
 	})
 
 	it("with last time's catalogue, Run and Restart stay defined while the bridge app is down", async () => {
@@ -94,7 +94,7 @@ describe('MIDI Bridge app control inside the MIDI Bridge connection', () => {
 		expect(Object.keys(app.actions())).toEqual(expect.arrayContaining(['ctl_bridge__run', 'ctl_bridge__restart']))
 		app.start()
 		await app.actions().ctl_bridge__run?.callback({ options: { mode: 'on' } }, {})
-		expect(host.logs.at(-1)).toMatch(/^MIDI Bridge isn't answering/)
+		expect(host.logs.at(-1)).toMatch(/^Console Bridge isn't answering/)
 	})
 
 	it('says once, and only once, when the bridge is too old to have app control', async () => {

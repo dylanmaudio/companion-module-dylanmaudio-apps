@@ -10,7 +10,7 @@ import type { AppId } from '../registry.js'
 import { KEY, PALETTE } from './palette.js'
 
 export const APP_NAME: Record<AppId, string> = {
-	bridge: 'MIDI Bridge',
+	bridge: 'Console Bridge',
 	tlt: 'Talk Light',
 	ptt: 'Pilot Tone',
 	tct: 'Time Code',
