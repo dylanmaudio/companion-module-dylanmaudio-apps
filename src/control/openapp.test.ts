@@ -10,12 +10,15 @@ const tlt = (): Catalogue => {
 }
 
 function context(over: Partial<OpenAppContext>) {
-	const calls = { pressed: [] as string[], logs: [] as string[] }
+	const calls = { pressed: [] as string[], values: [] as unknown[], logs: [] as string[] }
 	const ctx: OpenAppContext = {
 		app: 'tlt',
 		running: () => false,
 		catalogue: () => null,
-		press: async (c) => void calls.pressed.push(c),
+		press: async (c, v) => {
+			calls.pressed.push(c)
+			calls.values.push(v)
+		},
 		log: (_level, m) => void calls.logs.push(m),
 		...over,
 	}
@@ -53,6 +56,45 @@ describe('Open <app>', () => {
 		await openApp(ctx)
 		expect(calls.pressed).toEqual([])
 		expect(calls.logs[0]).toMatch(/already running/)
+	})
+
+	// #705: an app that offers a window toggle gets its window closed by a second press.
+	const withWindow = (): Catalogue => {
+		const c = tlt()
+		return {
+			...c,
+			controls: [...c.controls, { id: 'tlt.window', label: 'Window', kind: 'toggle', state: 'tlt.window_open' }],
+			state: [...c.state, { key: 'tlt.window_open', label: 'Window open', type: 'bool' }],
+		}
+	}
+
+	it('toggles the window when the app offers a window toggle (#705)', async () => {
+		const { ctx, calls } = context({ running: () => true, catalogue: withWindow })
+		await openApp(ctx)
+		expect(calls.pressed).toEqual(['tlt.window'])
+		expect(calls.values).toEqual(['toggle'])
+	})
+
+	it('a key already on a page, built before #705, toggles too: its options are empty', async () => {
+		const { ctx, calls } = context({ running: () => true, catalogue: withWindow })
+		await (openAppActions(ctx).open_app || undefined)?.callback({ options: {} } as never, {} as never)
+		expect(calls.pressed).toEqual(['tlt.window'])
+	})
+
+	it('can still be set to only bring the window forward', async () => {
+		const { ctx, calls } = context({ running: () => true, catalogue: withWindow })
+		const def = openAppActions(ctx).open_app || undefined
+		expect(def?.options).toEqual([expect.objectContaining({ type: 'dropdown', id: 'window', default: 'toggle' })])
+		await def?.callback({ options: { window: 'show' } } as never, {} as never)
+		expect(calls.pressed).toEqual(['tlt.show'])
+	})
+
+	it('ignores a window control that is not a toggle, and shows instead', async () => {
+		const odd = { ...withWindow() }
+		odd.controls = odd.controls.map((c) => (c.id === 'tlt.window' ? { ...c, kind: 'action' as const } : c))
+		const { ctx, calls } = context({ running: () => true, catalogue: () => odd })
+		await openApp(ctx)
+		expect(calls.pressed).toEqual(['tlt.show'])
 	})
 
 	it('is one action, named for the app', () => {

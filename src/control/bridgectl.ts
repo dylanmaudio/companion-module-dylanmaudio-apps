@@ -87,7 +87,7 @@ export class BridgeAppControl extends EventEmitter<BridgeAppEvents> {
 			host: address,
 			running: () => this.reporting(),
 			catalogue: () => this.catalogue,
-			press: async (control, abort) => this.press(control, undefined, abort),
+			press: async (control, value, abort) => this.press(control, value, abort),
 			log: (level, message) => this.host.log(level, message),
 		}
 		this.client.on('status', (s, message) => this.onStatus(s, message))

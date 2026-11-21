@@ -132,7 +132,7 @@ export class ControlAppMode {
 			host: address,
 			running: () => this.client.status === 'ok' || this.client.status === 'not_allowed',
 			catalogue: () => this.catalogue,
-			press: async (control, abort) => this.press(control, undefined, abort),
+			press: async (control, value, abort) => this.press(control, value, abort),
 			log: (level, message) => this.host.log(level, message),
 		}
 		this.client.on('status', (s, message) => {

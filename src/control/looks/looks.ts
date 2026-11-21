@@ -75,6 +75,17 @@ export function buildLookPresets(
 	// It is also the only key that wears the app's own colour. The rest of the deck
 	// stays neutral, so a lit key means something happened rather than which app it is.
 	const colour = brandOf(app, brand).deep
+	// #705: an app that reports its window gets a bar along the bottom while it
+	// is open. The bar is drawn in the key's own colour, so it is invisible until lit.
+	const windowKey = `${app}.window_open`
+	const openBar = (under: number): { el: Json[]; fb: Json[] } =>
+		has(windowKey)
+			? {
+					el: [box('open', under, { x: 0, y: 93, w: 100, h: 7 })],
+					fb: [whenOn(windowKey, [set('open', 'color', PALETTE.white)])],
+				}
+			: { el: [], fb: [] }
+	const logoBar = openBar(colour.bg)
 	add(
 		'logo',
 		layered(
@@ -83,8 +94,9 @@ export function buildLookPresets(
 				box('bg', colour.bg),
 				image('logo', APP_LOGOS[app], { x: 12, y: 4, w: 76, h: 70 }),
 				text('name', APP_NAME[app], { x: 0, y: 76, w: 100, h: 22 }, { color: colour.text }),
+				...logoBar.el,
 			],
-			[],
+			logoBar.fb,
 			openApp,
 		),
 	)
@@ -98,6 +110,7 @@ export function buildLookPresets(
 			.map(([value, png]) => whenIs(stateKey, value, [set('icon', 'base64Image', png)]))
 		if (app === 'bridge' && has('bridge.activity'))
 			feedbacks.push(whenOn('bridge.activity', [set('icon', 'base64Image', icons.activity)]))
+		const bar = openBar(PALETTE.window)
 		add(
 			'menubar',
 			layered(
@@ -106,8 +119,9 @@ export function buildLookPresets(
 					box('bg', PALETTE.window),
 					image('icon', icons.stopped, { x: 12, y: 4, w: 76, h: 60 }),
 					text('state', expr(variable(stateKey)), { x: 0, y: 68, w: 100, h: 30 }),
+					...bar.el,
 				],
-				feedbacks,
+				[...feedbacks, ...bar.fb],
 				openApp,
 			),
 		)

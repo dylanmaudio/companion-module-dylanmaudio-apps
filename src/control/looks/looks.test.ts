@@ -186,3 +186,40 @@ describe('styled keys', () => {
 		expect(Object.keys(buildLookPresets('ptt', null, 'ptt', (k) => k).presets)).toEqual(['p_ptt__look_logo'])
 	})
 })
+
+describe('the logo key and the app window (#705)', () => {
+	const withWindow = (app: AppId): Catalogue => {
+		const c = catOf(app)
+		return {
+			...c,
+			controls: [...c.controls, { id: `${app}.window`, label: 'Window', kind: 'toggle', state: `${app}.window_open` }],
+			state: [...c.state, { key: `${app}.window_open`, label: 'Window open', type: 'bool' }],
+		}
+	}
+
+	it('lights a bar along the bottom while the window is open, on the logo and the menu-bar icon', () => {
+		for (const app of APPS) {
+			const { presets } = buildLookPresets(app, withWindow(app), app, bareNaming(withWindow(app)))
+			for (const id of [`p_${app}__look_logo`, `p_${app}__look_menubar`]) {
+				const p = presets[id] as unknown as Json | undefined
+				if (!p) continue
+				const els = p.elements as Json[]
+				expect(
+					els.map((e) => e.id),
+					id,
+				).toContain('open')
+				expect(JSON.stringify(p.feedbacks), id).toContain('window_open')
+			}
+		}
+	})
+
+	it('changes nothing for an app that does not report its window', () => {
+		for (const app of APPS) {
+			const logo = buildLookPresets(app, catOf(app), app, bareNaming(catOf(app))).presets[
+				`p_${app}__look_logo`
+			] as unknown as Json
+			expect((logo.elements as Json[]).map((e) => e.id)).toEqual(['bg', 'logo', 'name'])
+			expect(logo.feedbacks).toEqual([])
+		}
+	})
+})

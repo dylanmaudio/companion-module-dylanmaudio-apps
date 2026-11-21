@@ -15,6 +15,14 @@
   Control's and Time Code Tool's text controls all need something typed, so
   they still have no preset. The action itself is unchanged, so a key you
   built with a marker name keeps its name.
+- **The logo key closes the window it opened** (dylanmaudio/dLive-Utility-Apps#705).
+  Opening an app's window from a deck was handy, but closing it took the
+  mouse. Now, where an app offers its window as a switch, the logo and
+  menu-bar keys open the window, close it on the next press, and light a
+  bar along the bottom while it is open. An app version without that switch
+  is brought to the front as before. Keys already on a page get the new
+  behaviour with no change; a new **Press** option on the action keeps
+  "only bring it to the front" for anyone who wants that.
 - **A key can say which app it belongs to.** A new connection setting,
   _Frame preset keys in the app's colour_, gives that connection's preset
   keys a frame in the app's bright colour and a badge with its initials

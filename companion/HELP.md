@@ -115,8 +115,12 @@ here without a new version of this module.
   the app's own look:
   - its **logo**, on the app's own colour as the app reports it, and its
     **menu-bar icon** (mirroring every state, with
-    Console Bridge's activity flash). Pressing either brings the app to the
-    front; if it isn't running, the log says to start it;
+    Console Bridge's activity flash). Pressing either opens the app's
+    window, and pressing again closes it; a white bar along the bottom lights
+    while the window is open. An app version that can't close its window from
+    Companion is brought to the front instead. The action's **Press** option
+    can be set to only bring it to the front. If the app isn't running, the
+    log says to start it: Companion never starts an app;
   - a round **Run** button that fills green while the app runs;
   - a **level meter** (Talk Light's and Pilot Tone's with the threshold marked);
   - Pilot Tone's **Auto / Latch** keys and **status tile**, amber when
