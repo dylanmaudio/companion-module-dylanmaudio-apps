@@ -1180,9 +1180,48 @@ describe('BridgeLink', () => {
 			// ids are the monorepo's own: Family("avantis", …) and
 			// Family("yamaha", "Yamaha Rivage PM / DM7 (RCP)") in
 			// sim/session/families.py, one id for both Yamaha desks.
-			expect(bridge.hellos[0].consoles).toEqual(['dlive', 'sq', 'wing', 'digico', 'avantis', 'yamaha'])
+			// qu and lv1 from 22 Nov, for 1.2.0: each driver's own name on main
+			expect(bridge.hellos[0].consoles).toEqual(['dlive', 'sq', 'wing', 'digico', 'avantis', 'yamaha', 'qu', 'lv1'])
 			fresh.stop()
 		})
+
+		for (const [driver, title] of [
+			['qu', 'Qu'],
+			['lv1', 'LV1'],
+		] as const) {
+			it(`drives a verified ${title}: mutes, scenes by place and levels in dB, never a dLive value`, async () => {
+				link.stop()
+				bridge.console = { driver, title, verified_on_desk: true }
+				bridge.caps = { raw: false, fade: true, query: true, fader_db: true, send_level: true }
+				bridge.cmds.length = 0
+				const fresh = new BridgeLink({
+					host: '127.0.0.1',
+					port: bridge.port,
+					laneName: `${driver}-drive`,
+					baseChannel: 1,
+					retryMs: 50,
+				})
+				const said: string[] = []
+				fresh.on('log', (_l, m) => said.push(m))
+				fresh.start()
+				await waitFor(() => fresh.status === 'ok', 'ok')
+				fresh.send({ op: 'mute', type: 'input', index: 3, on: true })
+				fresh.send({ op: 'scene', scene: 2 })
+				fresh.fadeTo({ type: 'input', index: 1 }, { db: -6 }, 0)
+				// a dLive wire value has no meaning on either desk
+				fresh.fadeTo({ type: 'input', index: 2 }, { lv: 107 }, 0)
+				await waitFor(() => bridge.cmds.length >= 3, 'cmds')
+				await new Promise((r) => setTimeout(r, 80))
+				const sent = bridge.cmds.map((c) => c.body.intent as Record<string, unknown>)
+				expect(sent).toHaveLength(3)
+				expect(sent).toContainEqual(expect.objectContaining({ op: 'mute', type: 'input', index: 3, on: true }))
+				expect(sent).toContainEqual(expect.objectContaining({ op: 'scene', scene: 2 }))
+				expect(sent).toContainEqual(expect.objectContaining({ op: 'fader', type: 'input', index: 1, db: -6 }))
+				expect(sent.every((i) => i.level === undefined && i.to_lv === undefined)).toBe(true)
+				expect(said.some((m) => m.includes('dLive bytes'))).toBe(false)
+				fresh.stop()
+			})
+		}
 
 		it('skips the cold sync on a verified desk, and says so without crying refusal', async () => {
 			// Found while auditing for 4 Nov. The cold sync is right to skip a

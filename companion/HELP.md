@@ -24,8 +24,11 @@ to the app that sent it.
 Heath **dLive**. With Console Bridge 1.5.0 or later it also drives:
 
 - an Allen & Heath **Avantis** or **SQ**;
+- an Allen & Heath **Qu**, the current range (not the Qu-16, Qu-24 or
+  Qu-32);
 - a Behringer **WING**;
-- a DiGiCo **SD11** or **Quantum 112**.
+- a DiGiCo **SD11** or **Quantum 112**;
+- a Waves **LV1**.
 
 On these it sends mutes, scene recalls and levels in dB, with names and
 state coming back as feedback. A few keys send dLive MIDI and only work on a
@@ -34,8 +37,8 @@ console Console Bridge hasn't checked on a real desk gets nothing from this
 module: a level meant for one desk lands somewhere else on another, so
 half-driving one is worse than not driving it.
 
-Allen & Heath, dLive, Avantis and SQ, Behringer and WING, and DiGiCo,
-SD11 and Quantum are trademarks of their owners, named here only to say
+Allen & Heath, dLive, Avantis, SQ and Qu, Behringer and WING, DiGiCo, SD11
+and Quantum, and Waves and LV1 are trademarks of their owners, named here only to say
 what this module works with.
 
 **It does not connect to a console directly.** You need the Console Bridge

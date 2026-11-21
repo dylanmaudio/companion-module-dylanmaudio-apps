@@ -93,8 +93,16 @@ const SCALED_OPS = new Set(['fader', 'fade', 'send_level', 'get_fader', 'get_sen
  *
  * Neither branch is on the monorepo's main. If a desk reports something else
  * on the day, this line is the only place that needs it.
+ *
+ * `qu` and `lv1` from 22 Nov 2026, for 1.2.0 (the operator: "yes add Qu and
+ * LV1 for 1.2.0"). Each is its driver's own `name` on the monorepo's main
+ * (shared/target/qu/driver.py and lv1/driver.py at 407f540e), and both are
+ * `verified_on_desk` there. Neither needs anything of its own here: the LV1
+ * takes a scene by its place from 1, as every place-numbered desk does (its
+ * driver subtracts the one), and both report levels in dB, so the per-op gate
+ * treats them exactly as it treats the SQ.
  */
-const CONSOLES = ['dlive', 'sq', 'wing', 'digico', 'avantis', 'yamaha']
+const CONSOLES = ['dlive', 'sq', 'wing', 'digico', 'avantis', 'yamaha', 'qu', 'lv1']
 
 /** Gets in flight during a cold sync: enough to be quick, not a spray (client API §11). */
 const COLD_SYNC_LANES = 4

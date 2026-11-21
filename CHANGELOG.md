@@ -2,13 +2,19 @@
 
 ## Unreleased (1.1.9x test line, not for the store)
 
+- **The Qu and the LV1 are driven.** The module now tells Console Bridge it
+  handles an Allen & Heath Qu (the current range) and a Waves LV1, so the
+  bridge no longer refuses what it sends them. On both, as on the SQ: mutes,
+  scene recalls by their place in the list, and levels in dB once the bridge
+  has verified that desk's dB law; a dLive 0–127 level is never sent. Needs
+  Console Bridge 1.5.0 or later set to that console.
 - **The bridge is called Console Bridge, its own name since 1.5.0,** and the
   settings, help and store listing now say which consoles this version
   drives. They said "dLive Console Bridge", and the help still said this
   module drives only a dLive, which stopped being true when levels in dB and
   the bridge's desk checks arrived (below). Named now: the dLive, and with
-  Console Bridge 1.5.0 or later the Avantis, SQ, WING, DiGiCo SD11 and
-  Quantum 112: the families the bridge has checked on a desk and this module
+  Console Bridge 1.5.0 or later the Avantis, SQ, Qu, WING, DiGiCo SD11,
+  Quantum 112 and LV1: the families the bridge has checked on a desk and this module
   tells the bridge it handles. No action, option or setting changed, so no
   key needs touching.
 - **Show Recorder is the sixth app** (port 8775), built from its own control
