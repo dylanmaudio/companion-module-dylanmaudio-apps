@@ -67,7 +67,7 @@ describe('Console Bridge app control inside the Console Bridge connection', () =
 		expect(app!.bridgeState).toBe('stopped')
 		expect(Object.keys(app!.presets().presets)).toEqual(expect.arrayContaining(['p_bridge__run']))
 		// the app frame, when the connection asks for it: the bridge's keys framed, its logo key not
-		const framed = app!.presets(true).presets
+		const framed = app!.presets({ frame: true, badge: true }).presets
 		expect(JSON.stringify(framed.p_bridge__run)).toContain('appBadge')
 		expect(JSON.stringify(app!.presets().presets.p_bridge__run)).not.toContain('appBadge')
 		expect(framed.p_bridge__look_logo).toBeDefined()

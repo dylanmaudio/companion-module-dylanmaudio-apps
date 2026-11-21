@@ -24,7 +24,7 @@ import {
 import { CONTROL_APPS, type AppId } from './registry.js'
 import { TalkFlash } from './talkflash.js'
 import { timecodeReadoutPresets } from './readout-defs.js'
-import { frameAllWithApp } from './looks/appframe.js'
+import { type AppMarks, frameAllWithApp, NO_MARKS } from './looks/appframe.js'
 import { buildLookPresets } from './looks/looks.js'
 import { openAppActions, type OpenAppContext } from './openapp.js'
 import {
@@ -71,8 +71,8 @@ export interface ControlModeOptions {
 	cachedCatalogue?: Catalogue | null
 	/** A catalogue arrived that differs from the one kept: keep this one for next time */
 	onCatalogue?: (cat: Catalogue) => void
-	/** Frame the control presets in the app's colour, with its badge (looks/appframe.ts) */
-	appFrame?: boolean
+	/** Frame and/or badge the control presets with the app (looks/appframe.ts) */
+	appMarks?: AppMarks
 }
 
 /** The Talk Light state key the talk flash follows, and the value that means talking. */
@@ -92,7 +92,7 @@ export class ControlAppMode {
 	private readonly keepCatalogue?: (cat: Catalogue) => void
 	private keptHash: string | undefined
 	private readonly openCtx: OpenAppContext
-	private appFrame: boolean
+	private appMarks: AppMarks
 	/** Each deck's last page that wasn't the TALK page, from "Talk flash: remember a deck's page" */
 	private readonly returnPages = new Map<number, number>()
 
@@ -105,7 +105,7 @@ export class ControlAppMode {
 	) {
 		this.name = CONTROL_APPS[app].name
 		this.talkPage = opts.talkFlashPage
-		this.appFrame = opts.appFrame === true
+		this.appMarks = opts.appMarks ?? NO_MARKS
 		this.cached = opts.cachedCatalogue?.app === app ? opts.cachedCatalogue : null
 		this.keepCatalogue = opts.onCatalogue
 		this.keptHash = this.cached?.hash
@@ -177,10 +177,10 @@ export class ControlAppMode {
 		if (this.flash) this.host.setVariableValues({ talk_page: page })
 	}
 
-	/** The app-frame setting changed: rebuild the presets, without reconnecting. */
-	configureAppFrame(on: boolean): void {
-		if (this.appFrame === on) return
-		this.appFrame = on
+	/** The frame or badge setting changed: rebuild the presets, without reconnecting. */
+	configureAppMarks(marks: AppMarks): void {
+		if (this.appMarks.frame === marks.frame && this.appMarks.badge === marks.badge) return
+		this.appMarks = marks
 		if (this.catalogue) this.define(this.catalogue, false, true)
 	}
 
@@ -256,7 +256,7 @@ export class ControlAppMode {
 		for (const [id, name] of Object.entries(this.extraVariables())) variables[id] = { name }
 		this.host.setVariableDefinitions(variables)
 		const built = buildControlPresets(cat, this.host.label)
-		if (this.appFrame) built.presets = frameAllWithApp(built.presets, this.app, this.client.info?.brand)
+		built.presets = frameAllWithApp(built.presets, this.app, this.client.info?.brand, this.appMarks)
 		if (flash) {
 			Object.assign(built.presets, talkFlashPresets())
 			built.sections.push(TALK_FLASH_SECTION)

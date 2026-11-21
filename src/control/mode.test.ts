@@ -268,12 +268,15 @@ describe("keeping an app's catalogue for next time", () => {
 	})
 })
 
-describe('the app frame setting', () => {
-	it('frames the control presets when on, and rebuilds them when it changes, without reconnecting', async () => {
+describe('the app frame and badge settings', () => {
+	it('frames and badges the control presets as asked, each on its own, rebuilt without reconnecting', async () => {
 		const mock = new CtlMock(load('sr.json'))
 		await mock.start()
 		const host = fakeHost('show_recorder')
-		const mode = new ControlAppMode(host as never, 'sr', '127.0.0.1', mock.port, { ...OPTS, appFrame: true })
+		const mode = new ControlAppMode(host as never, 'sr', '127.0.0.1', mock.port, {
+			...OPTS,
+			appMarks: { frame: true, badge: true },
+		})
 		mode.start()
 		await waitFor(() => 'p_sr__record' in host.presets, 'presets')
 		const badge = () => JSON.stringify(host.presets.p_sr__record).includes('appBadge')
@@ -282,10 +285,15 @@ describe('the app frame setting', () => {
 		expect(host.presets.p_sr__look_logo).toBeDefined()
 		expect(JSON.stringify(host.presets.p_sr__look_logo)).not.toContain('appBadge')
 		const asked = mock.requests.filter((r) => r.path === '/ctl/v1/info' || r.path === '/ctl/v1/catalogue').length
-		mode.configureAppFrame(false)
-		expect(badge()).toBe(false)
-		mode.configureAppFrame(true)
-		expect(badge()).toBe(true)
+		const framed = () => JSON.stringify(host.presets.p_sr__record).includes('borderWidth')
+		mode.configureAppMarks({ frame: true, badge: false })
+		expect([framed(), badge()]).toEqual([true, false])
+		mode.configureAppMarks({ frame: false, badge: true })
+		expect([framed(), badge()]).toEqual([false, true])
+		mode.configureAppMarks({ frame: false, badge: false })
+		expect([framed(), badge()]).toEqual([false, false])
+		mode.configureAppMarks({ frame: true, badge: true })
+		expect([framed(), badge()]).toEqual([true, true])
 		expect(mock.requests.filter((r) => r.path === '/ctl/v1/info' || r.path === '/ctl/v1/catalogue').length).toBe(asked)
 		mode.stop()
 		await mock.stop()

@@ -1,3 +1,4 @@
+import type { AppMarks } from './control/looks/appframe.js'
 import {
 	InstanceBase,
 	InstanceStatus,
@@ -139,7 +140,7 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 					this.config.talkFlashCooldownS,
 					this.config.talkFlashPage,
 				)
-				this.control?.configureAppFrame(this.config.appFrame)
+				this.control?.configureAppMarks(this.appMarks())
 				return
 			}
 			this.control?.stop()
@@ -257,6 +258,11 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 
 	// ------------------------------------------------------------ wiring
 
+	/** The connection's "which app is this key?" settings (looks/appframe.ts). */
+	private appMarks(): AppMarks {
+		return { frame: this.config.appFrame, badge: this.config.appBadge }
+	}
+
 	private startControlMode(): void {
 		this.control = new ControlAppMode(this, this.config.app, this.config.ctlHost, this.config.ctlPort, {
 			talkFlashHz: this.config.talkFlashHz,
@@ -265,7 +271,7 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 			token: this.secrets.ctlToken || undefined,
 			cachedCatalogue: parseCatalogue(this.config.ctlCatalogue),
 			onCatalogue: (cat) => this.keepCatalogue('ctlCatalogue', cat),
-			appFrame: this.config.appFrame,
+			appMarks: this.appMarks(),
 		})
 		this.control.start()
 	}
@@ -385,7 +391,7 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 		})
 		this.setVariableValues(allVariableValues(this.link.state, this.scope, this.meta()))
 		const { sections, presets } = buildPresets(this, this.scope)
-		const app = this.bridgeApp?.presets(this.config.appFrame)
+		const app = this.bridgeApp?.presets(this.appMarks())
 		this.setPresetDefinitions(app ? [...sections, ...app.sections] : sections, { ...presets, ...app?.presets })
 		this.link.subscriptions.clear()
 		this.checkAllFeedbacks()

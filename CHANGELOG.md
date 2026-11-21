@@ -23,12 +23,13 @@
   is brought to the front as before. Keys already on a page get the new
   behaviour with no change; a new **Press** option on the action keeps
   "only bring it to the front" for anyone who wants that.
-- **A key can say which app it belongs to.** A new connection setting,
-  _Frame preset keys in the app's colour_, gives that connection's preset
-  keys a frame in the app's bright colour and a badge with its initials
-  (CB, TL, PT, TC, CC, SR), so Console Control's Next Marker and Show
-  Recorder's Next can share a page without being mistaken for each other.
-  It is off by default: on a page of one app, the logo key says whose page
+- **A key can say which app it belongs to.** Two new connection settings,
+  each on its own: _Frame preset keys in the app's colour_ puts a frame in
+  the app's bright colour on all four edges, and _Add the app's initials_
+  puts a badge (CB, TL, PT, TC, CC, SR) in the top-left corner. Together or
+  apart, they let Console Control's Next Marker and Show Recorder's Next
+  share a page without being mistaken for each other. Both are off by
+  default: on a page of one app, the logo key says whose page
   it is, and the deck stays neutral so that state stands out. Text moves
   clear of the badge and inside the frame. A show-critical bar is still
   drawn over the frame. Keys already on a page are untouched. The look was

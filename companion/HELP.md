@@ -105,11 +105,14 @@ here without a new version of this module.
   its name.
 
 - **Pages that mix apps.** Console Control and Show Recorder both have a
-  Next Marker. Tick **Frame preset keys in the app's colour** on a
-  connection, and its preset keys get a frame in the app's colour and its
-  initials in a corner: CB, TL, PT, TC, CC, SR. Leave it off for a page that
-  holds one app, where the logo key already says whose page it is. It
-  changes presets only; keys already on a page keep their look.
+  Next Marker. Two settings on each connection tell their keys apart, and
+  either works alone:
+  - **Frame preset keys in the app's colour**: a frame on all four edges;
+  - **Add the app's initials**: CB, TL, PT, TC, CC or SR in the top-left corner.
+
+  Leave both off for a page that holds one app, where the logo key already
+  says whose page it is. They change presets only; keys already on a page
+  keep their look.
 
 - **Styled keys.** Each app also has a _styled keys_ preset section, in
   the app's own look:

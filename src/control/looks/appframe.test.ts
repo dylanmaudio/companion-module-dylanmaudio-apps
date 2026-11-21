@@ -102,6 +102,27 @@ describe('a framed key', () => {
 		expect(el(frameWithApp(sr.p_sr__record!, 'sr'), 'mark')).toMatchObject({ y: mark.y, height: mark.height })
 	})
 
+	it('the frame and the badge each work alone', () => {
+		const frameOnly = frameWithApp(sr.p_sr__record!, 'sr', null, { frame: true, badge: false })
+		expect(el(frameOnly, 'bg')?.borderWidth).toBe(FRAME_WIDTH)
+		expect(el(frameOnly, 'appBadge')).toBeUndefined()
+		// text stays inside the frame, but nothing makes room for a badge that isn't there
+		const tlt = presetsOf('tlt')
+		expect(
+			el(frameWithApp(tlt.p_tlt__threshold__show!, 'tlt', null, { frame: true, badge: false }), 'caption')?.x,
+		).toBe(FRAME_WIDTH)
+		const badgeOnly = frameWithApp(sr.p_sr__record!, 'sr', null, { frame: false, badge: true })
+		expect(el(badgeOnly, 'bg')?.borderWidth).toBeUndefined()
+		expect(el(badgeOnly, 'appBadge')).toMatchObject({ x: 3, y: 3 })
+		expect(el(badgeOnly, 'appBadgeText')?.text).toBe('SR')
+	})
+
+	it('neither: the preset is returned as it was', () => {
+		const none = { frame: false, badge: false }
+		expect(frameWithApp(sr.p_sr__record!, 'sr', null, none)).toBe(sr.p_sr__record)
+		expect(frameAllWithApp(sr, 'sr', null, none)).toBe(sr)
+	})
+
 	it('frames a whole set, and leaves a preset with no bg box as it is', () => {
 		const all = frameAllWithApp(sr, 'sr')
 		expect(Object.keys(all)).toEqual(Object.keys(sr))
@@ -111,16 +132,21 @@ describe('a framed key', () => {
 	})
 })
 
-describe('the setting', () => {
-	it('is off unless it is set, so a one-app page stays neutral', () => {
-		expect(normaliseConfig({}).appFrame).toBe(false)
-		expect(normaliseConfig({ appFrame: 'yes' as never }).appFrame).toBe(false)
-		expect(normaliseConfig({ appFrame: true }).appFrame).toBe(true)
+describe('the settings', () => {
+	it('are off unless set, so a one-app page stays neutral', () => {
+		expect(normaliseConfig({})).toMatchObject({ appFrame: false, appBadge: false })
+		expect(normaliseConfig({ appFrame: 'yes' as never, appBadge: 1 as never })).toMatchObject({
+			appFrame: false,
+			appBadge: false,
+		})
+		expect(normaliseConfig({ appFrame: true, appBadge: true })).toMatchObject({ appFrame: true, appBadge: true })
 	})
 
-	it('is a checkbox every connection shows, defaulting to off', () => {
-		const f = GetConfigFields().find((x) => x.id === 'appFrame')
-		expect(f).toMatchObject({ type: 'checkbox', default: false })
-		expect((f as { isVisibleExpression?: string }).isVisibleExpression).toBeUndefined()
+	it('are two checkboxes every connection shows, both off by default', () => {
+		for (const id of ['appFrame', 'appBadge']) {
+			const f = GetConfigFields().find((x) => x.id === id)
+			expect(f, id).toMatchObject({ type: 'checkbox', default: false })
+			expect((f as { isVisibleExpression?: string }).isVisibleExpression).toBeUndefined()
+		}
 	})
 })
