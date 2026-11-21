@@ -2,11 +2,15 @@
 
 ## Unreleased (1.1.9x test line, not for the store)
 
-- **The bridge is called Console Bridge, its own name since 1.5.0.** The
-  connection settings and the store listing said "dLive Console Bridge"; the app
-  dropped the "dLive" when it took on other consoles. What this module does
-  through it is still dLive-only, so the settings now say that in words. No
-  action, option or setting changed, so no key needs touching.
+- **The bridge is called Console Bridge, its own name since 1.5.0,** and the
+  settings, help and store listing now say which consoles this version
+  drives. They said "dLive Console Bridge", and the help still said this
+  module drives only a dLive, which stopped being true when levels in dB and
+  the bridge's desk checks arrived (below). Named now: the dLive, and with
+  Console Bridge 1.5.0 or later the Avantis, SQ, WING, DiGiCo SD11 and
+  Quantum 112: the families the bridge has checked on a desk and this module
+  tells the bridge it handles. No action, option or setting changed, so no
+  key needs touching.
 - **Show Recorder is the sixth app** (port 8775), built from its own control
   catalogue like the other four: transport, markers, dropout reset, takes and
   the session's state on the keys. Its Master Out mute is a red key while the

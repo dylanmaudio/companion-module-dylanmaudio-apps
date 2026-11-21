@@ -20,12 +20,23 @@ have connected — a DAW, Console Control, other apps — all sharing one
 console connection and one MIDI monitor that attributes every message
 to the app that sent it.
 
-**This version drives an Allen & Heath dLive, and only a dLive.** MIDI
-Bridge can drive other Allen & Heath consoles, and when it is connected
-to one this module sends nothing to it and says so: a dLive fader value
-means a different level on another desk, so half-driving one is worse
-than not driving it. Support for other consoles comes in a later module
-version, which will say so here.
+**Which consoles.** Through Console Bridge this module drives an Allen &
+Heath **dLive**. With Console Bridge 1.5.0 or later it also drives:
+
+- an Allen & Heath **Avantis** or **SQ**;
+- a Behringer **WING**;
+- a DiGiCo **SD11** or **Quantum 112**.
+
+On these it sends mutes, scene recalls and levels in dB, with names and
+state coming back as feedback. A few keys send dLive MIDI and only work on a
+dLive; on another console they send nothing and say why in the log. A
+console Console Bridge hasn't checked on a real desk gets nothing from this
+module: a level meant for one desk lands somewhere else on another, so
+half-driving one is worse than not driving it.
+
+Allen & Heath, dLive, Avantis and SQ, Behringer and WING, and DiGiCo,
+SD11 and Quantum are trademarks of their owners, named here only to say
+what this module works with.
 
 **It does not connect to a console directly.** You need the Console Bridge
 app (v1.1 or later) running and connected to your desk. Console address,
