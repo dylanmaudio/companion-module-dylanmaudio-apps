@@ -138,7 +138,10 @@ describe('styled keys', () => {
 
 	it("the bridge's icon shows MIDI activity over its state, with bridge_ variables", () => {
 		const { presets } = looksFor('bridge')
-		const fbs = presets.p_bridge__look_menubar.feedbacks as Json[]
+		// activity is drawn over every state icon: it comes after them (the #705 window bar is another element)
+		const fbs = (presets.p_bridge__look_menubar.feedbacks as Json[]).filter(
+			(f) => f.feedbackId !== 'st_bridge__window_open',
+		)
 		expect(fbs.at(-1)).toMatchObject({ feedbackId: 'st_bridge__activity' })
 		expect(JSON.stringify(presets.p_bridge__look_menubar.elements)).toContain('$(dlive:bridge_state)')
 		expect(presets.p_bridge__look_run).toBeDefined()
@@ -188,12 +191,14 @@ describe('styled keys', () => {
 })
 
 describe('the logo key and the app window (#705)', () => {
-	const withWindow = (app: AppId): Catalogue => {
+	// every app's fixture offers the window since #705
+	const withWindow = catOf
+	const withoutWindow = (app: AppId): Catalogue => {
 		const c = catOf(app)
 		return {
 			...c,
-			controls: [...c.controls, { id: `${app}.window`, label: 'Window', kind: 'toggle', state: `${app}.window_open` }],
-			state: [...c.state, { key: `${app}.window_open`, label: 'Window open', type: 'bool' }],
+			controls: c.controls.filter((x) => x.id !== `${app}.window`),
+			state: c.state.filter((s) => s.key !== `${app}.window_open`),
 		}
 	}
 
@@ -215,7 +220,7 @@ describe('the logo key and the app window (#705)', () => {
 
 	it('changes nothing for an app that does not report its window', () => {
 		for (const app of APPS) {
-			const logo = buildLookPresets(app, catOf(app), app, bareNaming(catOf(app))).presets[
+			const logo = buildLookPresets(app, withoutWindow(app), app, bareNaming(withoutWindow(app))).presets[
 				`p_${app}__look_logo`
 			] as unknown as Json
 			expect((logo.elements as Json[]).map((e) => e.id)).toEqual(['bg', 'logo', 'name'])

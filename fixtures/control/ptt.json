@@ -71,6 +71,12 @@
         "id": "ptt.show",
         "label": "Show window",
         "kind": "action"
+      },
+      {
+        "id": "ptt.window",
+        "label": "Window",
+        "kind": "toggle",
+        "state": "ptt.window_open"
       }
     ],
     "state": [
@@ -150,6 +156,11 @@
         "key": "ptt.send_now_available",
         "label": "Send now available",
         "type": "bool"
+      },
+      {
+        "key": "ptt.window_open",
+        "label": "Window open",
+        "type": "bool"
       }
     ]
   },
@@ -164,7 +175,8 @@
     "ptt.integrity_errors": 0,
     "ptt.link": "absent",
     "ptt.unreachable": false,
-    "ptt.send_now_available": false
+    "ptt.send_now_available": false,
+    "ptt.window_open": false
   },
   "refusals": {
     "ptt.reset": "Signal is still below threshold — stay on backup."
@@ -436,6 +448,118 @@
           }
         }
       }
+    },
+    {
+      "id": "cmd.window.on",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w1",
+          "control": "ptt.window",
+          "value": "on"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w1",
+          "control": "ptt.window",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "ptt.show",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.toggle_closes",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w2",
+          "control": "ptt.window",
+          "value": "toggle"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w2",
+          "control": "ptt.window",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "ptt.hide",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.toggle_opens",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w3",
+          "control": "ptt.window",
+          "value": "toggle"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w3",
+          "control": "ptt.window",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "ptt.show",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.off",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w4",
+          "control": "ptt.window",
+          "value": "off"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w4",
+          "control": "ptt.window",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "ptt.hide",
+          null
+        ]
+      ]
     }
   ]
 }

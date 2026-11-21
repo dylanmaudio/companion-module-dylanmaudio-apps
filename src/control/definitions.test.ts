@@ -286,6 +286,7 @@ describe('Pilot Tone Trigger (fixtures/control/ptt.json)', () => {
 				'st_ptt__state__is',
 				'st_ptt__tone_running',
 				'st_ptt__unreachable',
+				'st_ptt__window_open',
 			].sort(),
 		)
 		const vars = Object.keys(buildControlVariables(pc)).filter((k) => !k.startsWith('ctl_'))
@@ -302,6 +303,7 @@ describe('Pilot Tone Trigger (fixtures/control/ptt.json)', () => {
 				'threshold_db',
 				'tone_running',
 				'unreachable',
+				'window_open',
 			].sort(),
 		)
 		const { presets } = buildControlPresets(pc, 'ptt')
@@ -318,6 +320,7 @@ describe('Pilot Tone Trigger (fixtures/control/ptt.json)', () => {
 				'p_ptt__threshold__show',
 				'p_ptt__threshold__up',
 				'p_ptt__tone',
+				'p_ptt__window',
 			].sort(),
 		)
 	})
@@ -342,6 +345,7 @@ describe('Talk Light Trigger (fixtures/control/tlt.json)', () => {
 			'st_tlt__running',
 			'st_tlt__talk__is',
 			'st_tlt__unreachable',
+			'st_tlt__window_open',
 		])
 		const { presets } = buildControlPresets(tc, 'tlt')
 		expect(JSON.stringify(presets.p_tlt__threshold__show)).toContain('$(tlt:threshold_db)')
@@ -425,7 +429,7 @@ describe('Console Control (fixtures/control/cxc.json)', () => {
 
 	it('keeps the command names, hyphens and all, in the action ids', () => {
 		const ids = Object.keys(buildControlActions(cc, async () => undefined))
-		expect(ids).toHaveLength(59)
+		expect(ids).toHaveLength(60)
 		expect(ids).toEqual(
 			expect.arrayContaining(['ctl_cxc__go-to-start', 'ctl_cxc__toggle-show-mode', 'ctl_cxc__go-to-marker']),
 		)
@@ -486,6 +490,7 @@ describe('MIDI Bridge app control (fixtures/control/bridge.json)', () => {
 			'bridge_running',
 			'bridge_state',
 			'bridge_version',
+			'bridge_window_open',
 		])
 		expect(controlVariableValues(bc, { 'bridge.state': 'connected' }, prefixedNaming)).toEqual({
 			bridge_state: 'connected',

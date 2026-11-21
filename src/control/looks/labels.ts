@@ -113,6 +113,11 @@ const looks: [string, KeyLook][] = [
 		`${app}.show`,
 		{ text: `SHOW\n${RUN_NAME[app]}` },
 	]),
+	// #705: the window as a switch, lit while it is open
+	...(['bridge', 'tlt', 'ptt', 'tct', 'cxc', 'sr'] as const).map((app): [string, KeyLook] => [
+		`${app}.window`,
+		{ text: `${RUN_NAME[app]}\nWINDOW` },
+	]),
 
 	['bridge.restart', { text: 'RESTART\nBRIDGE', glyph: GLYPH.reset }],
 	['bridge.autoreconnect', { text: 'AUTO\nRECONNECT' }],

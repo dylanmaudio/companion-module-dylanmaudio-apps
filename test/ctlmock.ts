@@ -69,6 +69,13 @@ export class CtlMock {
 	infoPadBytes = 0
 	/** a press's handler that takes this long to return */
 	cmdDelayMs = 0
+	/**
+	 * Which case to answer with when several match the same request. A
+	 * stateless replayer can't tell them apart: #705's cmd.window.toggle_closes
+	 * and toggle_opens send the same "toggle" and differ only in whether the
+	 * window was open before. The client test names the case it is replaying.
+	 */
+	prefer: string | null = null
 	private held: ServerResponse[] = []
 	private ring: { seq: number; frame: string }[] = []
 	private streams = new Set<ServerResponse>()
@@ -185,7 +192,7 @@ export class CtlMock {
 			}
 			case 'POST /ctl/v1/cmd': {
 				if (this.cmdDelayMs) await new Promise((r) => setTimeout(r, this.cmdDelayMs))
-				const c = fx.cases.find(
+				const matching = fx.cases.filter(
 					(x) =>
 						x.request.path === '/ctl/v1/cmd' &&
 						x.request.body?.control === body?.control &&
@@ -193,6 +200,7 @@ export class CtlMock {
 						(x.setup?.allowed ?? true) === this.allowed &&
 						(x.setup?.locked ?? false) === this.locked,
 				)
+				const c = matching.find((x) => x.id === this.prefer) ?? matching[0]
 				if (!c) return json(500, { ok: false, error: { code: 'no_fixture_case', message: JSON.stringify(body) } })
 				const rb = { ...c.response.body, cid: body?.cid }
 				const err = rb.error as { code: string; message?: unknown } | undefined

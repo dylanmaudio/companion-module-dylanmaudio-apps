@@ -58,6 +58,7 @@ describe('Console Bridge app control inside the Console Bridge connection', () =
 			'ctl_bridge__restart',
 			'ctl_bridge__run',
 			'ctl_bridge__show',
+			'ctl_bridge__window',
 			'open_app',
 		])
 		expect(Object.keys(app!.variables())).toEqual(

@@ -116,6 +116,12 @@
         "id": "tct.show",
         "label": "Show window",
         "kind": "action"
+      },
+      {
+        "id": "tct.window",
+        "label": "Window",
+        "kind": "toggle",
+        "state": "tct.window_open"
       }
     ],
     "state": [
@@ -229,6 +235,11 @@
           "29.97nd",
           "30"
         ]
+      },
+      {
+        "key": "tct.window_open",
+        "label": "Window open",
+        "type": "bool"
       }
     ]
   },
@@ -248,7 +259,8 @@
     "tct.mtc_out": false,
     "tct.ltc_out": false,
     "tct.generate_start": "01:00:00:00",
-    "tct.generate_rate": "25"
+    "tct.generate_rate": "25",
+    "tct.window_open": false
   },
   "cases": [
     {
@@ -700,6 +712,118 @@
       },
       "calls": [],
       "note": "Render WAV opens a file dialog and is deliberately not a control."
+    },
+    {
+      "id": "cmd.window.on",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w1",
+          "control": "tct.window",
+          "value": "on"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w1",
+          "control": "tct.window",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "tct.show",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.toggle_closes",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w2",
+          "control": "tct.window",
+          "value": "toggle"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w2",
+          "control": "tct.window",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "tct.hide",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.toggle_opens",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w3",
+          "control": "tct.window",
+          "value": "toggle"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w3",
+          "control": "tct.window",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "tct.show",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.off",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w4",
+          "control": "tct.window",
+          "value": "off"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w4",
+          "control": "tct.window",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "tct.hide",
+          null
+        ]
+      ]
     }
   ]
 }

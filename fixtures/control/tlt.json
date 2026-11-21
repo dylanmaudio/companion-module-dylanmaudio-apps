@@ -31,6 +31,12 @@
         "id": "tlt.show",
         "label": "Show window",
         "kind": "action"
+      },
+      {
+        "id": "tlt.window",
+        "label": "Window",
+        "kind": "toggle",
+        "state": "tlt.window_open"
       }
     ],
     "state": [
@@ -89,6 +95,11 @@
         "key": "tlt.unreachable",
         "label": "Not reaching the console",
         "type": "bool"
+      },
+      {
+        "key": "tlt.window_open",
+        "label": "Window open",
+        "type": "bool"
       }
     ]
   },
@@ -100,7 +111,8 @@
     "tlt.talk_scene": 500,
     "tlt.quiet_scene": 499,
     "tlt.link": "absent",
-    "tlt.unreachable": false
+    "tlt.unreachable": false,
+    "tlt.window_open": false
   },
   "refusals": {},
   "cases": [
@@ -400,6 +412,118 @@
         }
       },
       "calls": []
+    },
+    {
+      "id": "cmd.window.on",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w1",
+          "control": "tlt.window",
+          "value": "on"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w1",
+          "control": "tlt.window",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "tlt.show",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.toggle_closes",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w2",
+          "control": "tlt.window",
+          "value": "toggle"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w2",
+          "control": "tlt.window",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "tlt.hide",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.toggle_opens",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w3",
+          "control": "tlt.window",
+          "value": "toggle"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w3",
+          "control": "tlt.window",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "tlt.show",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.off",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w4",
+          "control": "tlt.window",
+          "value": "off"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w4",
+          "control": "tlt.window",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "tlt.hide",
+          null
+        ]
+      ]
     }
   ]
 }

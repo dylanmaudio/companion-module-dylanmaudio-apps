@@ -159,6 +159,7 @@ for (const file of FILES) {
 			it(c.id, async () => {
 				mock.allowed = c.setup?.allowed ?? true
 				mock.locked = c.setup?.locked ?? false
+				mock.prefer = c.id
 				const { control, value } = c.request.body as { control: string; value?: CmdValue }
 				const r = await client.cmd(control, value)
 

@@ -8,6 +8,15 @@ const tlt = (): Catalogue => {
 	const fx = load('tlt.json')
 	return { app: 'tlt', name: 'Talk Light Trigger', version: 'x', hash: 'h', ...fx.catalogue } as Catalogue
 }
+/** Talk Light as it was before #705: show, but no window switch. */
+const tltBefore705 = (): Catalogue => {
+	const c = tlt()
+	return {
+		...c,
+		controls: c.controls.filter((x) => x.id !== 'tlt.window'),
+		state: c.state.filter((s) => s.key !== 'tlt.window_open'),
+	}
+}
 
 function context(over: Partial<OpenAppContext>) {
 	const calls = { pressed: [] as string[], values: [] as unknown[], logs: [] as string[] }
@@ -44,14 +53,14 @@ describe('Open <app>', () => {
 		expect(local.calls.logs).toEqual(["Talk Light Trigger isn't running. Start it on this Mac, then press again."])
 	})
 
-	it('asks a running app to show itself, when it offers a show control', async () => {
-		const { ctx, calls } = context({ running: () => true, catalogue: tlt })
+	it('asks a running app to show itself, when it offers a show control but no window switch', async () => {
+		const { ctx, calls } = context({ running: () => true, catalogue: tltBefore705 })
 		await openApp(ctx)
 		expect(calls.pressed).toEqual(['tlt.show'])
 	})
 
 	it('leaves a running app without a show control alone, and says why', async () => {
-		const older = { ...tlt(), controls: tlt().controls.filter((c) => c.id !== 'tlt.show') }
+		const older = { ...tltBefore705(), controls: tltBefore705().controls.filter((c) => c.id !== 'tlt.show') }
 		const { ctx, calls } = context({ running: () => true, catalogue: () => older })
 		await openApp(ctx)
 		expect(calls.pressed).toEqual([])
@@ -59,14 +68,16 @@ describe('Open <app>', () => {
 	})
 
 	// #705: an app that offers a window toggle gets its window closed by a second press.
-	const withWindow = (): Catalogue => {
-		const c = tlt()
-		return {
-			...c,
-			controls: [...c.controls, { id: 'tlt.window', label: 'Window', kind: 'toggle', state: 'tlt.window_open' }],
-			state: [...c.state, { key: 'tlt.window_open', label: 'Window open', type: 'bool' }],
-		}
-	}
+	// Talk Light's real catalogue, as fixtures/control/tlt.json carries it since #705
+	const withWindow = tlt
+
+	it('the real fixture offers the switch in the shape the module looks for', () => {
+		expect(tlt().controls.find((c) => c.id === 'tlt.window')).toMatchObject({
+			kind: 'toggle',
+			state: 'tlt.window_open',
+		})
+		expect(tlt().state.find((s) => s.key === 'tlt.window_open')).toMatchObject({ type: 'bool' })
+	})
 
 	it('toggles the window when the app offers a window toggle (#705)', async () => {
 		const { ctx, calls } = context({ running: () => true, catalogue: withWindow })

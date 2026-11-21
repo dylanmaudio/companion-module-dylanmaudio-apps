@@ -74,6 +74,13 @@
         "group": "app"
       },
       {
+        "id": "sr.window",
+        "label": "Window",
+        "kind": "toggle",
+        "state": "sr.window_open",
+        "group": "app"
+      },
+      {
         "id": "sr.master_out_mute",
         "label": "Mute Master Out",
         "kind": "toggle",
@@ -97,13 +104,13 @@
       },
       {
         "key": "sr.time",
-        "label": "Time",
+        "label": "Time (playhead on the timeline)",
         "type": "string",
         "max_rate_hz": 10.0
       },
       {
         "key": "sr.take",
-        "label": "Take number",
+        "label": "Take (recording, or the last one)",
         "type": "number"
       },
       {
@@ -137,6 +144,11 @@
         "type": "bool"
       },
       {
+        "key": "sr.window_open",
+        "label": "Window open",
+        "type": "bool"
+      },
+      {
         "key": "sr.master_out_muted",
         "label": "Master Out muted",
         "type": "bool"
@@ -151,6 +163,7 @@
     "sr.dropouts": 0,
     "sr.disk_left": "",
     "sr.disk_warning": false,
+    "sr.window_open": false,
     "sr.session": "",
     "sr.dirty": false,
     "sr.master_out_muted": false
@@ -230,6 +243,114 @@
       "calls": [
         [
           "record"
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.on",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w1",
+          "control": "sr.window",
+          "value": "on"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w1",
+          "control": "sr.window",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "show_window"
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.toggle_closes",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w2",
+          "control": "sr.window",
+          "value": "toggle"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w2",
+          "control": "sr.window",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "hide_window"
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.toggle_opens",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w3",
+          "control": "sr.window",
+          "value": "toggle"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w3",
+          "control": "sr.window",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "show_window"
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.off",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w4",
+          "control": "sr.window",
+          "value": "off"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w4",
+          "control": "sr.window",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "hide_window"
         ]
       ]
     },

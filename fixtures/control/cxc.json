@@ -385,6 +385,13 @@
         "group": "app"
       },
       {
+        "id": "cxc.window",
+        "label": "Window",
+        "kind": "toggle",
+        "state": "cxc.window_open",
+        "group": "app"
+      },
+      {
         "id": "cxc.reference-out-mute",
         "label": "Reference out mute",
         "kind": "toggle",
@@ -510,6 +517,11 @@
         "key": "cxc.go_count",
         "label": "Moments in the cue list",
         "type": "number"
+      },
+      {
+        "key": "cxc.window_open",
+        "label": "Window open",
+        "type": "bool"
       }
     ]
   },
@@ -531,7 +543,8 @@
     "cxc.go_standby": 0,
     "cxc.go_standby_name": null,
     "cxc.go_fired_name": null,
-    "cxc.go_count": 0
+    "cxc.go_count": 0,
+    "cxc.window_open": false
   },
   "refusals": {
     "go-to-marker": "Show Mode: Go to Marker is not available with no markers."
@@ -963,6 +976,118 @@
       },
       "calls": [],
       "note": "The eight app-only commands (file dialogs, dialog-first, two-argument edits, sync-from-console) are not controls."
+    },
+    {
+      "id": "cmd.window.on",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w1",
+          "control": "cxc.window",
+          "value": "on"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w1",
+          "control": "cxc.window",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "cxc.show",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.toggle_closes",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w2",
+          "control": "cxc.window",
+          "value": "toggle"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w2",
+          "control": "cxc.window",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "cxc.hide",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.toggle_opens",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w3",
+          "control": "cxc.window",
+          "value": "toggle"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w3",
+          "control": "cxc.window",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "cxc.show",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.off",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w4",
+          "control": "cxc.window",
+          "value": "off"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w4",
+          "control": "cxc.window",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "cxc.hide",
+          null
+        ]
+      ]
     }
   ]
 }

@@ -34,6 +34,12 @@
         "id": "bridge.show",
         "label": "Show window",
         "kind": "action"
+      },
+      {
+        "id": "bridge.window",
+        "label": "Window",
+        "kind": "toggle",
+        "state": "bridge.window_open"
       }
     ],
     "state": [
@@ -86,6 +92,11 @@
         "key": "bridge.version",
         "label": "Version",
         "type": "string"
+      },
+      {
+        "key": "bridge.window_open",
+        "label": "Window open",
+        "type": "bool"
       }
     ]
   },
@@ -97,7 +108,8 @@
     "bridge.console": "192.168.1.10:51325",
     "bridge.msg_rate": 0.0,
     "bridge.autoreconnect": true,
-    "bridge.version": "<str>"
+    "bridge.version": "<str>",
+    "bridge.window_open": false
   },
   "refusals": {},
   "cases": [
@@ -481,6 +493,118 @@
         }
       },
       "calls": []
+    },
+    {
+      "id": "cmd.window.on",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w1",
+          "control": "bridge.window",
+          "value": "on"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w1",
+          "control": "bridge.window",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "bridge.show",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.toggle_closes",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w2",
+          "control": "bridge.window",
+          "value": "toggle"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w2",
+          "control": "bridge.window",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "bridge.hide",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.toggle_opens",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w3",
+          "control": "bridge.window",
+          "value": "toggle"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w3",
+          "control": "bridge.window",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "bridge.show",
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.window.off",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "w4",
+          "control": "bridge.window",
+          "value": "off"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "cid": "w4",
+          "control": "bridge.window",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "bridge.hide",
+          null
+        ]
+      ]
     }
   ]
 }
