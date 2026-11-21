@@ -321,9 +321,9 @@ function bridgeFields(ctx: ConfigFieldContext): SomeCompanionConfigField[] {
 			type: 'static-text',
 			id: 'info',
 			width: 12,
-			label: 'dLive Console Bridge (formerly MIDI Bridge)',
+			label: 'Console Bridge (formerly MIDI Bridge)',
 			value:
-				'This module talks to the <b>dLive Console Bridge</b> application — called <b>MIDI Bridge</b> before version 1.5.0 — which owns the connection to the console. Set the console address, base MIDI channel and reconnect behaviour <b>in the bridge</b> — this module inherits them. Status goes green only once the bridge reports its console link is up.',
+				'This module talks to the <b>Console Bridge</b> application — called <b>MIDI Bridge</b> before version 1.5.0 — which owns the connection to the console. Through it, this module drives an Allen &amp; Heath <b>dLive</b>. Set the console address, base MIDI channel and reconnect behaviour <b>in the bridge</b> — this module inherits them. Status goes green only once the bridge reports its console link is up.',
 		},
 		{
 			type: 'textinput',
