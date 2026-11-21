@@ -8,6 +8,13 @@
   output is muted, not the green a toggle's own state would give it, and it
   carries the show-critical bar, because un-muting is the half that can
   surprise a room.
+- **Show Recorder's Add marker has a ready-made key.** It drops a marker
+  with no name, as Console Control's Add Marker does; the app names it. A
+  control that takes typed text gets a preset only when the app's own pattern
+  says a blank value is allowed. Today that is this one control: Console
+  Control's and Time Code Tool's text controls all need something typed, so
+  they still have no preset. The action itself is unchanged, so a key you
+  built with a marker name keeps its name.
 - **MIDI Bridge is now Console Bridge** (dylanmaudio/dLive-Utility-Apps#694).
   The app is renamed at its 1.5.0, because it no longer speaks only MIDI —
   OSC to the Wing and the DiGiCo SD, RCP to the Yamahas — and because the old

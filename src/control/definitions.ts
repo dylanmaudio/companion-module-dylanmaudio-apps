@@ -195,6 +195,20 @@ function nudgeable(c: ControlDef): boolean {
 	return Boolean(c.step && c.state)
 }
 
+/**
+ * A text control whose pattern explicitly accepts '' — the app saying a blank
+ * value means something. No pattern says nothing either way, so it doesn't
+ * count; neither does a pattern that doesn't compile.
+ */
+export function acceptsEmpty(c: ControlDef): boolean {
+	if (c.kind !== 'text' || !c.pattern) return false
+	try {
+		return new RegExp(`^(?:${c.pattern})$`).test('')
+	} catch {
+		return false
+	}
+}
+
 /** What makes a control special, for the action's description. */
 function describeControl(c: ControlDef, cat: Catalogue): string | undefined {
 	const parts: string[] = []
@@ -553,7 +567,16 @@ export function buildControlPresets(
 				break
 			}
 			case 'text':
-				break // a value typed per button: no sensible ready-made preset
+				// A value typed per button, so mostly no ready-made preset. But where
+				// the app's own pattern accepts an empty value (Show Recorder's Add
+				// marker, which names it for you), a blank press is a complete
+				// action, the way Console Control's Add Marker needs no text.
+				if (acceptsEmpty(c))
+					add(
+						pid,
+						controlKey(c.label, short, tint, isCritical(c), lights(look), L.press(aid, { value: '' }), look?.glyph),
+					)
+				break
 		}
 	}
 	// Controls that carry a group (Console Control's menu categories) get a

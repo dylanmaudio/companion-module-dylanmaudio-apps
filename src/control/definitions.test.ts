@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+	acceptsEmpty,
 	actionId,
 	boolFeedbackId,
 	buildControlActions,
@@ -496,5 +497,31 @@ describe('MIDI Bridge app control (fixtures/control/bridge.json)', () => {
 		expect(a.ctl_bridge__run?.description).toMatch(/Show-critical when set to Off/)
 		expect(a.ctl_bridge__restart?.description).toMatch(/^Show-critical:/)
 		expect(a.ctl_bridge__autoreconnect?.description).toBeUndefined()
+	})
+})
+
+describe('a text control whose blank value means something', () => {
+	const { cat: sc } = loadFx('sr.json')
+	const { presets } = buildControlPresets(sc, 'show_recorder')
+	const marker = sc.controls.find((c) => c.id === 'sr.marker')!
+
+	it("gets a ready-made key when the app's pattern accepts '' (Show Recorder's Add marker)", async () => {
+		expect(acceptsEmpty(marker)).toBe(true)
+		const p = presets.p_sr__marker
+		expect(p).toMatchObject({ type: 'layered', name: 'Add marker' })
+		const down = (p as unknown as { steps: { down: unknown[] }[] }).steps[0].down
+		expect(down).toEqual([{ actionId: 'ctl_sr__marker', options: { value: '' } }])
+		// and that press puts a blank name on the wire, which the pattern allows
+		expect(await pressIn(sc, 'ctl_sr__marker', { value: '' })).toEqual({ control: 'sr.marker', value: '' })
+	})
+
+	it('no other control in any fixture qualifies: a pattern that needs text, or none at all, gets no key', () => {
+		const qualifying = ['bridge', 'tlt', 'ptt', 'tct', 'cxc', 'sr']
+			.flatMap((a) => loadFx(`${a}.json`).cat.controls)
+			.filter((c) => acceptsEmpty(c))
+			.map((c) => c.id)
+		expect(qualifying).toEqual(['sr.marker'])
+		expect(acceptsEmpty({ id: 'x.free', label: 'Free', kind: 'text' })).toBe(false)
+		expect(acceptsEmpty({ id: 'x.bad', label: 'Bad', kind: 'text', pattern: '(' })).toBe(false)
 	})
 })
