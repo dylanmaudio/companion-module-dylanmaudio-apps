@@ -66,6 +66,12 @@ describe('Console Bridge app control inside the Console Bridge connection', () =
 		expect(host.vars).toMatchObject({ bridge_running: false, bridge_autoreconnect: true, bridge_app_connected: true })
 		expect(app!.bridgeState).toBe('stopped')
 		expect(Object.keys(app!.presets().presets)).toEqual(expect.arrayContaining(['p_bridge__run']))
+		// the app frame, when the connection asks for it: the bridge's keys framed, its logo key not
+		const framed = app!.presets(true).presets
+		expect(JSON.stringify(framed.p_bridge__run)).toContain('appBadge')
+		expect(JSON.stringify(app!.presets().presets.p_bridge__run)).not.toContain('appBadge')
+		expect(framed.p_bridge__look_logo).toBeDefined()
+		expect(JSON.stringify(framed.p_bridge__look_logo)).not.toContain('appBadge')
 	})
 
 	it('follows the core as the app reports it, and says when that changes', async () => {

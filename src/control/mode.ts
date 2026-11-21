@@ -24,6 +24,7 @@ import {
 import { CONTROL_APPS, type AppId } from './registry.js'
 import { TalkFlash } from './talkflash.js'
 import { timecodeReadoutPresets } from './readout-defs.js'
+import { frameAllWithApp } from './looks/appframe.js'
 import { buildLookPresets } from './looks/looks.js'
 import { openAppActions, type OpenAppContext } from './openapp.js'
 import {
@@ -70,6 +71,8 @@ export interface ControlModeOptions {
 	cachedCatalogue?: Catalogue | null
 	/** A catalogue arrived that differs from the one kept: keep this one for next time */
 	onCatalogue?: (cat: Catalogue) => void
+	/** Frame the control presets in the app's colour, with its badge (looks/appframe.ts) */
+	appFrame?: boolean
 }
 
 /** The Talk Light state key the talk flash follows, and the value that means talking. */
@@ -89,6 +92,7 @@ export class ControlAppMode {
 	private readonly keepCatalogue?: (cat: Catalogue) => void
 	private keptHash: string | undefined
 	private readonly openCtx: OpenAppContext
+	private appFrame: boolean
 	/** Each deck's last page that wasn't the TALK page, from "Talk flash: remember a deck's page" */
 	private readonly returnPages = new Map<number, number>()
 
@@ -101,6 +105,7 @@ export class ControlAppMode {
 	) {
 		this.name = CONTROL_APPS[app].name
 		this.talkPage = opts.talkFlashPage
+		this.appFrame = opts.appFrame === true
 		this.cached = opts.cachedCatalogue?.app === app ? opts.cachedCatalogue : null
 		this.keepCatalogue = opts.onCatalogue
 		this.keptHash = this.cached?.hash
@@ -172,6 +177,13 @@ export class ControlAppMode {
 		if (this.flash) this.host.setVariableValues({ talk_page: page })
 	}
 
+	/** The app-frame setting changed: rebuild the presets, without reconnecting. */
+	configureAppFrame(on: boolean): void {
+		if (this.appFrame === on) return
+		this.appFrame = on
+		if (this.catalogue) this.define(this.catalogue, false, true)
+	}
+
 	private extraVariables(): Record<string, string> {
 		return this.flash ? { ...META_VARIABLES, ...TALK_FLASH_VARIABLES } : META_VARIABLES
 	}
@@ -228,7 +240,7 @@ export class ControlAppMode {
 		})
 	}
 
-	private define(cat: Catalogue, fromLastTime = false): void {
+	private define(cat: Catalogue, fromLastTime = false, quiet = false): void {
 		this.catalogue = cat
 		const flash = this.flash
 		this.host.setActionDefinitions({
@@ -244,6 +256,7 @@ export class ControlAppMode {
 		for (const [id, name] of Object.entries(this.extraVariables())) variables[id] = { name }
 		this.host.setVariableDefinitions(variables)
 		const built = buildControlPresets(cat, this.host.label)
+		if (this.appFrame) built.presets = frameAllWithApp(built.presets, this.app, this.client.info?.brand)
 		if (flash) {
 			Object.assign(built.presets, talkFlashPresets())
 			built.sections.push(TALK_FLASH_SECTION)
@@ -258,12 +271,13 @@ export class ControlAppMode {
 		built.sections.push(look.section)
 		this.host.setPresetDefinitions(built.sections, built.presets)
 		this.publishFlash()
-		this.host.log(
-			'info',
-			fromLastTime
-				? `${cat.name}: using its controls from last time until it answers`
-				: `${cat.name}${cat.version ? ` ${cat.version}` : ''}: ${cat.controls.length} controls, ${cat.state.length} state values`,
-		)
+		if (!quiet)
+			this.host.log(
+				'info',
+				fromLastTime
+					? `${cat.name}: using its controls from last time until it answers`
+					: `${cat.name}${cat.version ? ` ${cat.version}` : ''}: ${cat.controls.length} controls, ${cat.state.length} state values`,
+			)
 		this.publishMeta()
 	}
 

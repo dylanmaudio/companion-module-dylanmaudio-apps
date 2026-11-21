@@ -32,6 +32,11 @@ export type ModuleConfig = {
 	talkFlashCooldownS: number
 	/** Talk Light only: the page the TALK page was imported to, 0 = off — the triggers read it as $(tlt:talk_page) */
 	talkFlashPage: number
+	/**
+	 * Frame this connection's preset keys in the app's colour, with its initials
+	 * in a corner — for pages that mix apps. Off: a one-app page stays neutral.
+	 */
+	appFrame: boolean
 	bridgeHost: string
 	bridgePort: number
 	/** The bridge app's own /ctl/v1 endpoint, on bridgeHost. 0 = its standard 8770 */
@@ -71,6 +76,7 @@ export const DEFAULT_CONFIG: ModuleConfig = {
 	talkFlashHz: TALK_FLASH_DEFAULT_HZ,
 	talkFlashCooldownS: TALK_FLASH_DEFAULT_COOLDOWN_S,
 	talkFlashPage: TALK_FLASH_DEFAULT_PAGE,
+	appFrame: false,
 	bridgeHost: '127.0.0.1',
 	bridgePort: 8765,
 	bridgeCtlPort: 0,
@@ -126,6 +132,7 @@ export function normaliseConfig(raw: Partial<ModuleConfig> | null | undefined): 
 	c.talkFlashHz = clampTalkFlashHz(c.talkFlashHz)
 	c.talkFlashCooldownS = clampTalkFlashCooldown(c.talkFlashCooldownS)
 	c.talkFlashPage = clampInt(c.talkFlashPage, 0, 999, TALK_FLASH_DEFAULT_PAGE)
+	c.appFrame = c.appFrame === true
 	if (!c.bridgeHost) c.bridgeHost = '127.0.0.1'
 	c.bridgePort = clampInt(c.bridgePort, 1, 65535, 8765)
 	c.bridgeCtlPort = clampInt(c.bridgeCtlPort, 0, 65535, 0)
@@ -270,7 +277,21 @@ export function GetConfigFields(ctx: ConfigFieldContext = {}): SomeCompanionConf
 			isVisibleExpression: TLT_ONLY,
 		},
 	]
-	return [appField, ...controlFields, ...bridgeFields(ctx).map((f) => ({ ...f, isVisibleExpression: BRIDGE_ONLY }))]
+	const frameField: SomeCompanionConfigField = {
+		type: 'checkbox',
+		id: 'appFrame',
+		label: "Frame preset keys in the app's colour",
+		tooltip:
+			"For pages that mix apps: each preset key from this connection gets a frame in the app's colour and its initials in a corner (CC, SR…), so Console Control's Next Marker can't be mistaken for Show Recorder's. Leave it off for a page of one app. Changes presets only: keys already on a page keep their look.",
+		width: 12,
+		default: false,
+	}
+	return [
+		appField,
+		...controlFields,
+		...bridgeFields(ctx).map((f) => ({ ...f, isVisibleExpression: BRIDGE_ONLY })),
+		frameField,
+	]
 }
 
 function bridgeFields(ctx: ConfigFieldContext): SomeCompanionConfigField[] {

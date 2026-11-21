@@ -139,6 +139,7 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 					this.config.talkFlashCooldownS,
 					this.config.talkFlashPage,
 				)
+				this.control?.configureAppFrame(this.config.appFrame)
 				return
 			}
 			this.control?.stop()
@@ -264,6 +265,7 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 			token: this.secrets.ctlToken || undefined,
 			cachedCatalogue: parseCatalogue(this.config.ctlCatalogue),
 			onCatalogue: (cat) => this.keepCatalogue('ctlCatalogue', cat),
+			appFrame: this.config.appFrame,
 		})
 		this.control.start()
 	}
@@ -383,7 +385,7 @@ export default class DliveInstance extends InstanceBase<ModuleSchema> implements
 		})
 		this.setVariableValues(allVariableValues(this.link.state, this.scope, this.meta()))
 		const { sections, presets } = buildPresets(this, this.scope)
-		const app = this.bridgeApp?.presets()
+		const app = this.bridgeApp?.presets(this.config.appFrame)
 		this.setPresetDefinitions(app ? [...sections, ...app.sections] : sections, { ...presets, ...app?.presets })
 		this.link.subscriptions.clear()
 		this.checkAllFeedbacks()

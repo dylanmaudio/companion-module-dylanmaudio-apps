@@ -15,6 +15,16 @@
   Control's and Time Code Tool's text controls all need something typed, so
   they still have no preset. The action itself is unchanged, so a key you
   built with a marker name keeps its name.
+- **A key can say which app it belongs to.** A new connection setting,
+  _Frame preset keys in the app's colour_, gives that connection's preset
+  keys a frame in the app's bright colour and a badge with its initials
+  (CB, TL, PT, TC, CC, SR), so Console Control's Next Marker and Show
+  Recorder's Next can share a page without being mistaken for each other.
+  It is off by default: on a page of one app, the logo key says whose page
+  it is, and the deck stays neutral so that state stands out. Text moves
+  clear of the badge and inside the frame. A show-critical bar is still
+  drawn over the frame. Keys already on a page are untouched. The look was
+  chosen from four candidates on a real deck.
 - **MIDI Bridge is now Console Bridge** (dylanmaudio/dLive-Utility-Apps#694).
   The app is renamed at its 1.5.0, because it no longer speaks only MIDI —
   OSC to the Wing and the DiGiCo SD, RCP to the Yamahas — and because the old

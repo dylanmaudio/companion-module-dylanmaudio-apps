@@ -29,6 +29,7 @@ import {
 	feedbackIdsForKey,
 	prefixedNaming,
 } from './definitions.js'
+import { frameAllWithApp } from './looks/appframe.js'
 import { buildLookPresets } from './looks/looks.js'
 import { openAppActions, type OpenAppContext } from './openapp.js'
 import { CONTROL_APPS } from './registry.js'
@@ -147,11 +148,13 @@ export class BridgeAppControl extends EventEmitter<BridgeAppEvents> {
 		return Object.fromEntries(Object.entries(BRIDGE_APP_VARIABLES).map(([id, name]) => [id, { name }]))
 	}
 
-	presets(): ReturnType<typeof buildControlPresets> {
+	/** The bridge app's own keys; `framed` gives them the app frame and badge (looks/appframe.ts). */
+	presets(framed = false): ReturnType<typeof buildControlPresets> {
 		const look = buildLookPresets('bridge', this.catalogue, this.host.label, prefixedNaming, this.client.info?.brand)
 		const built = this.catalogue
 			? buildControlPresets(this.catalogue, this.host.label, prefixedNaming)
 			: { sections: [], presets: {} }
+		if (framed) built.presets = frameAllWithApp(built.presets, 'bridge', this.client.info?.brand)
 		return { sections: [...built.sections, look.section], presets: { ...built.presets, ...look.presets } }
 	}
 
