@@ -186,10 +186,7 @@ export function GetConfigFields(ctx: ConfigFieldContext = {}): SomeCompanionConf
 		default: 'bridge',
 		choices: APP_IDS.map((id) => ({
 			id,
-			label:
-				id === 'bridge'
-					? 'Console Bridge (formerly MIDI Bridge) — the dLive console, with full feedback'
-					: CONTROL_APPS[id].name,
+			label: id === 'bridge' ? 'Console Bridge (formerly MIDI Bridge) — drives the console' : CONTROL_APPS[id].name,
 		})),
 	}
 	const controlFields: SomeCompanionConfigField[] = [
