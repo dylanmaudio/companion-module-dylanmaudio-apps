@@ -27,7 +27,7 @@ Heath **dLive**. With Console Bridge 1.5.0 or later it also drives:
 - an Allen & Heath **Qu**, the current range (not the Qu-16, Qu-24 or
   Qu-32);
 - a Behringer **WING**;
-- a DiGiCo **SD11** or **Quantum 112**;
+- a DiGiCo **SD** or **Quantum**;
 - a Waves **LV1**.
 
 On these it sends mutes, scene recalls and levels in dB, with names and
@@ -37,7 +37,7 @@ console Console Bridge hasn't checked on a real desk gets nothing from this
 module: a level meant for one desk lands somewhere else on another, so
 half-driving one is worse than not driving it.
 
-Allen & Heath, dLive, Avantis, SQ and Qu, Behringer and WING, DiGiCo, SD11
+Allen & Heath, dLive, Avantis, SQ and Qu, Behringer and WING, DiGiCo, SD
 and Quantum, and Waves and LV1 are trademarks of their owners, named here only to say
 what this module works with.
 

@@ -4,7 +4,7 @@
 	"id": "dylanmaudio-apps",
 	"name": "dylanmaudio-apps",
 	"shortname": "dylanmaudio",
-	"description": "Control the dylanmaudio apps: Console Bridge (formerly MIDI Bridge), Talk Light Trigger, Pilot Tone Trigger, Time Code Tool, Console Control and Show Recorder. Through Console Bridge it drives an Allen & Heath dLive with full state feedback, and with Console Bridge 1.5.0 or later an Allen & Heath Avantis, SQ or Qu (current range), a Behringer WING, a DiGiCo SD11 or Quantum 112, or a Waves LV1. Requires the apps; it does not connect to a console directly.",
+	"description": "Control the dylanmaudio apps: Console Bridge (formerly MIDI Bridge), Talk Light Trigger, Pilot Tone Trigger, Time Code Tool, Console Control and Show Recorder. Through Console Bridge it drives an Allen & Heath dLive with full state feedback, and with Console Bridge 1.5.0 or later an Allen & Heath Avantis, SQ or Qu (current range), a Behringer WING, a DiGiCo SD or Quantum, or a Waves LV1. Requires the apps; it does not connect to a console directly.",
 	"version": "0.0.0",
 	"license": "MIT",
 	"repository": "git+https://github.com/bitfocus/companion-module-dylanmaudio-apps.git",

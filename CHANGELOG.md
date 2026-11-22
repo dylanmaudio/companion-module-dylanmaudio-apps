@@ -18,9 +18,11 @@
   drives. They said "dLive Console Bridge", and the help still said this
   module drives only a dLive, which stopped being true when levels in dB and
   the bridge's desk checks arrived (below). Named now: the dLive, and with
-  Console Bridge 1.5.0 or later the Avantis, SQ, Qu, WING, DiGiCo SD11,
-  Quantum 112 and LV1: the families the bridge has checked on a desk and this module
-  tells the bridge it handles. No action, option or setting changed, so no
+  Console Bridge 1.5.0 or later the Avantis, SQ, Qu, WING, DiGiCo SD and
+  Quantum, and LV1: the families the bridge has checked on a desk and this
+  module tells the bridge it handles. DiGiCo is named by series, not by the
+  SD11 and Quantum 112 that were checked, so people with other SD and
+  Quantum desks can try it (#716). No action, option or setting changed, so no
   key needs touching.
 - **Show Recorder is the sixth app** (port 8775), built from its own control
   catalogue like the other four: transport, markers, dropout reset, takes and
