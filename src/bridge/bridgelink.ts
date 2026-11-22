@@ -173,6 +173,15 @@ export function foreignFamily(info: Record<string, unknown>): string | null {
 	return typeof title === 'string' && title !== '' ? title : driver
 }
 
+/**
+ * "a" or "an" before a console's name, by how it is said: an Avantis, an SQ,
+ * an LV1, an SD11 (letters said one by one), but a WING, a Qu, a DM7, a Rivage.
+ */
+export function aOrAn(name: string): string {
+	const spelt = /^[FHLMNRSX][A-Z0-9]/.test(name)
+	return `${/^[AEIOU]/i.test(name) || spelt ? 'an' : 'a'} ${name}`
+}
+
 /** This console names its scenes by number (the DiGiCo SD), not by place. */
 export function sceneByNumber(info: Record<string, unknown>): boolean {
 	const block = info.console
@@ -749,7 +758,7 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			this.emit(
 				'log',
 				'debug',
-				`No cold sync on a ${this.foreignFamily}: its values come from the bridge's mirror, not from Gets.`,
+				`No cold sync on ${aOrAn(this.foreignFamily)}: its values come from the bridge's mirror, not from Gets.`,
 			)
 			return
 		}
@@ -1077,8 +1086,8 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 					'log',
 					'info',
 					dliveBytes
-						? `${op} isn't sent on a ${family}: it is encoded as dLive bytes, which mean something else there.`
-						: `${op} isn't sent on a ${family}: its value is a dLive fader scale, and this desk wants dB. ` +
+						? `${op} isn't sent on ${aOrAn(family)}: it is encoded as dLive bytes, which mean something else there.`
+						: `${op} isn't sent on ${aOrAn(family)}: its value is a dLive fader scale, and this desk wants dB. ` +
 								`Mutes, scenes and names work; levels come with the console's own scale.`,
 				)
 			}
@@ -1089,12 +1098,12 @@ export class BridgeLink extends EventEmitter<LinkEvents> implements LinkApi {
 			this.emit(
 				'log',
 				'warn',
-				`Console Bridge is driving a ${family}, and this module version drives a dLive only. ` +
-					`Nothing is being sent to the console: a dLive fader value means a different level on a ${family}. ` +
+				`Console Bridge is driving ${aOrAn(family)}, and this module version has not been checked against one. ` +
+					`Nothing is being sent to the console: a dLive fader value means a different level on ${aOrAn(family)}. ` +
 					`Watch for a module version that lists ${family} support.`,
 			)
 		} else {
-			this.emit('log', 'debug', `Not sending ${op}: the bridge is driving a ${family}`)
+			this.emit('log', 'debug', `Not sending ${op}: the bridge is driving ${aOrAn(family)}`)
 		}
 		return true
 	}

@@ -8,7 +8,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BridgeLink, deltaToEvent, type BridgeLinkOptions } from './bridgelink.js'
+import { aOrAn, BridgeLink, deltaToEvent, type BridgeLinkOptions } from './bridgelink.js'
 import { encode, toHex } from '../protocol/encode.js'
 import { SCENE_PATH } from '../state/model.js'
 
@@ -1076,6 +1076,20 @@ describe('BridgeLink', () => {
 			return { fresh, logs }
 		}
 
+		it('says a or an the way the name is said', () => {
+			expect(['Avantis', 'SQ', 'LV1', 'SD11', 'WING', 'Qu', 'DM7', 'Rivage', 'DiGiCo'].map(aOrAn)).toEqual([
+				'an Avantis',
+				'an SQ',
+				'an LV1',
+				'an SD11',
+				'a WING',
+				'a Qu',
+				'a DM7',
+				'a Rivage',
+				'a DiGiCo',
+			])
+		})
+
 		it('sends nothing to the console, and says why once', async () => {
 			const { fresh, logs } = await connectTo({ driver: 'sq', title: 'SQ' })
 			// a fader is the dangerous one: 0-127 is unity on a dLive and near
@@ -1088,7 +1102,7 @@ describe('BridgeLink', () => {
 			expect(bridge.cmds.filter((c) => (c.body.intent as { op?: string }).op !== 'query')).toEqual([])
 			const warnings = logs.filter((l) => l.startsWith('warn:') && l.includes('SQ'))
 			expect(warnings).toHaveLength(1)
-			expect(warnings[0]).toContain('drives a dLive only')
+			expect(warnings[0]).toContain('driving an SQ, and this module version has not been checked against one')
 			fresh.stop()
 		})
 

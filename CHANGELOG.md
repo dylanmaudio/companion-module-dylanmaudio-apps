@@ -2,6 +2,11 @@
 
 ## Unreleased (1.1.9x test line, not for the store)
 
+- **The log stops saying a console it doesn't know means dLive only.** A
+  console Console Bridge drives but this version hasn't been checked against
+  now reads "has not been checked against one" — the module drives seven
+  others. The log also says "an LV1", "an SQ" and "an Avantis".
+
 - **The Qu and the LV1 are driven.** The module now tells Console Bridge it
   handles an Allen & Heath Qu (the current range) and a Waves LV1, so the
   bridge no longer refuses what it sends them. On both, as on the SQ: mutes,
