@@ -86,6 +86,15 @@ describe('SubscriptionRegistry', () => {
 		r.remove('fb2')
 		expect(r.isWatched('mute/input/1')).toBe(false)
 	})
+
+	it('says when the set changed, which is when a value is worth priming', () => {
+		const r = new SubscriptionRegistry()
+		expect(r.touch('fb1', ['param/input/1/49'])).toBe(true) // newly placed
+		expect(r.touch('fb1', ['param/input/1/49'])).toBe(false) // every evaluation after
+		expect(r.touch('fb1', ['param/input/2/49'])).toBe(true) // options edited
+		r.clear()
+		expect(r.touch('fb1', ['param/input/2/49'])).toBe(true) // after a reconnect
+	})
 })
 
 describe('QueryScheduler', () => {

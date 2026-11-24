@@ -296,8 +296,11 @@ without re-exporting anything.
 - **Sends, assigns, preamps, HPF**: not announced by the desk, and the
   bridge's state mirror does not yet carry them. Feedbacks for these
   reflect changes _this module_ makes, and will not follow changes made
-  on the surface or by another controller. They are listed in
-  `$(dlive:unsupported_gets)` so the limitation is visible.
+  on the surface or by another controller. Each one says so in its own
+  description where you pick it, and the moment one is on a button the
+  connection log says it once and the op joins
+  `$(dlive:unsupported_gets)`. A button of this kind sitting at false is
+  this, not a broken connection.
 - Anything the module sets itself is mirrored immediately, so buttons
   update even if the desk does not echo.
 

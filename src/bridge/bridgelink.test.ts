@@ -10,7 +10,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { aOrAn, BridgeLink, deltaToEvent, type BridgeLinkOptions } from './bridgelink.js'
 import { encode, toHex } from '../protocol/encode.js'
-import { SCENE_PATH } from '../state/model.js'
+import { SCENE_PATH, paramPath } from '../state/model.js'
+import { PARAM_HPF_ON } from '../protocol/intents.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const exchanges = JSON.parse(readFileSync(join(here, '..', '..', 'fixtures', 'api', 'exchanges.json'), 'utf8')) as {
@@ -269,6 +270,21 @@ describe('BridgeLink', () => {
 		expect(link.state.strip({ type: 'input', index: 5 }).level).toBe(95)
 		expect(link.state.currentScene).toBe(12)
 		expect(link.bridgeBaseChannel).toBe(1)
+	})
+
+	it('a param-family Get is recorded as unsupported, not sent, and said once', async () => {
+		link.start()
+		await waitFor(() => link.isOk, 'ok')
+		const before = bridge.cmds.length
+		const ref = { type: 'input' as const, index: 1 }
+		// What a placed "HPF is on" feedback now does when its subscription is new.
+		link.query({ op: 'get_param', ...ref, param: PARAM_HPF_ON }, paramPath(ref, PARAM_HPF_ON), 'low')
+		link.query({ op: 'get_param', ...ref, param: PARAM_HPF_ON }, paramPath(ref, PARAM_HPF_ON), 'low')
+		// The mirror has no path for it, so nothing is asked of the bridge...
+		expect(bridge.cmds.length).toBe(before)
+		// ...but the operator can now see why the button never moves.
+		expect(link.diag().unsupported).toBe('get_param')
+		expect(logs.filter((m) => m.includes('no bridge mirror support'))).toHaveLength(1)
 	})
 
 	it('cold sync: asks about every strip in scope, and only for what the scope covers', async () => {

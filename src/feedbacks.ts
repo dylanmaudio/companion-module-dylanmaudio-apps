@@ -18,7 +18,7 @@ function levelDb(s: StripState): number | null | undefined {
 	if (s.db !== undefined) return s.db
 	return s.level === undefined ? undefined : lvToDb(s.level)
 }
-import { PARAM_ASSIGN, PARAM_HPF_ON, PARAM_MAIN_ASSIGN } from './protocol/intents.js'
+import { PARAM_ASSIGN, PARAM_HPF_ON, PARAM_MAIN_ASSIGN, type Intent } from './protocol/intents.js'
 import {
 	CONNECTION_PATH,
 	SCENE_PATH,
@@ -53,6 +53,20 @@ const GREEN = combineRgb(0, 160, 60)
 const AMBER = combineRgb(220, 160, 0)
 const BLACK = combineRgb(0, 0, 0)
 
+/**
+ * Said on every feedback the bridge's state mirror cannot answer.
+ *
+ * Client API v1 mirrors mutes, faders, names, colours, stereo links, the
+ * scene and the connection. The param family — assigns, HPF, preamps, send
+ * levels — has no path there, so in bridge mode these read back only what
+ * this module itself set. A customer reported it as "all the feedbacks that
+ * pull actual values from the console report false" (23 Nov 2026), having
+ * found the HPF and then the assign; it is nine feedbacks, and it is a gap in
+ * the mirror rather than anything the desk does or does not announce.
+ */
+const LOCAL_ONLY =
+	'Follows only what this module sets. The bridge state mirror does not carry this value yet, so a change made on the surface or by another controller will not appear here.'
+
 function num(o: Opts, key: string, dflt = 0): number {
 	const v = o[key]
 	const n = typeof v === 'number' ? v : Number(v)
@@ -63,13 +77,34 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 	const link = ctx.link
 	const subs = link.subscriptions
 
-	/** Wrap a callback so the feedback registers the paths it read; bad options unsubscribe it. */
-	const watch = <T>(fn: (o: Opts, register: (...paths: string[]) => void) => T, fallback: T) => {
+	/**
+	 * Wrap a callback so the feedback registers the paths it read; bad options
+	 * unsubscribe it.
+	 *
+	 * A callback may also `ask` for the value behind a path it reads. That Get
+	 * goes out once, when the subscription is new, never on the evaluations
+	 * that follow. In direct mode it primes the feedback from the desk. In
+	 * bridge mode a param-family Get has nowhere to land, so BridgeLink sends
+	 * nothing and records the op instead — which is what puts it in
+	 * `$(<label>:unsupported_gets)` and the log. Without the ask, that
+	 * diagnostic only ever fired for someone who had *also* placed a
+	 * param-family action, so an operator whose HPF button sat at false was
+	 * told nothing at all.
+	 */
+	const watch = <T>(
+		fn: (o: Opts, register: (...paths: string[]) => void, ask: (intent: Intent, path: string) => void) => T,
+		fallback: T,
+	) => {
 		return (feedback: { id: string; options: Opts }): T => {
 			const paths: string[] = []
+			const gets: [Intent, string][] = []
 			try {
-				const r = fn(feedback.options, (...p) => paths.push(...p))
-				subs.touch(feedback.id, paths)
+				const r = fn(
+					feedback.options,
+					(...p) => paths.push(...p),
+					(intent, path) => gets.push([intent, path]),
+				)
+				if (subs.touch(feedback.id, paths)) for (const [intent, path] of gets) link.query(intent, path, 'low')
 				return r
 			} catch (e) {
 				subs.remove(feedback.id)
@@ -210,11 +245,13 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 		main_assigned: {
 			type: 'boolean',
 			name: 'Assigned to main mix',
+			description: LOCAL_ONLY,
 			defaultStyle: { bgcolor: GREEN, color: WHITE },
 			options: [...channelFields({ types: CHOICES_ASSIGNABLE_TYPES })],
-			callback: watch((o, reg) => {
+			callback: watch((o, reg, ask) => {
 				const ref = strip(o, reg)
 				reg(paramPath(ref, PARAM_MAIN_ASSIGN))
+				ask({ op: 'get_param', ...ref, param: PARAM_MAIN_ASSIGN }, paramPath(ref, PARAM_MAIN_ASSIGN))
 				return link.state.strip(ref).mainAssign === true
 			}, false),
 			unsubscribe,
@@ -222,14 +259,16 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 		dca_assigned: {
 			type: 'boolean',
 			name: 'Assigned to DCA',
+			description: LOCAL_ONLY,
 			defaultStyle: { bgcolor: GREEN, color: WHITE },
 			options: [
 				...channelFields({ types: CHOICES_ASSIGNABLE_TYPES }),
 				{ type: 'number', id: 'dca', label: 'DCA', default: 1, min: 1, max: 24 },
 			],
-			callback: watch((o, reg) => {
+			callback: watch((o, reg, ask) => {
 				const ref = strip(o, reg)
 				reg(paramPath(ref, PARAM_ASSIGN))
+				ask({ op: 'get_param', ...ref, param: PARAM_ASSIGN }, paramPath(ref, PARAM_ASSIGN))
 				return link.state.strip(ref).dca.has(Math.round(num(o, 'dca', 1)))
 			}, false),
 			unsubscribe,
@@ -237,14 +276,16 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 		mute_group_assigned: {
 			type: 'boolean',
 			name: 'Assigned to mute group',
+			description: LOCAL_ONLY,
 			defaultStyle: { bgcolor: GREEN, color: WHITE },
 			options: [
 				...channelFields({ types: CHOICES_ASSIGNABLE_TYPES }),
 				{ type: 'number', id: 'group', label: 'Mute group', default: 1, min: 1, max: 8 },
 			],
-			callback: watch((o, reg) => {
+			callback: watch((o, reg, ask) => {
 				const ref = strip(o, reg)
 				reg(paramPath(ref, PARAM_ASSIGN))
+				ask({ op: 'get_param', ...ref, param: PARAM_ASSIGN }, paramPath(ref, PARAM_ASSIGN))
 				return link.state.strip(ref).muteGroups.has(Math.round(num(o, 'group', 1)))
 			}, false),
 			unsubscribe,
@@ -252,15 +293,17 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 		mix_assigned: {
 			type: 'boolean',
 			name: 'Input assigned to group / aux / matrix',
+			description: LOCAL_ONLY,
 			defaultStyle: { bgcolor: GREEN, color: WHITE },
 			options: [
 				{ type: 'number', id: 'index', label: 'Input', default: 1, min: 1, max: 128 },
 				...channelFields({ types: CHOICES_MIX_DEST, prefix: 'dest', label: 'Mix', defaultType: 'mono_aux' }),
 			],
-			callback: watch((o, reg) => {
+			callback: watch((o, reg, ask) => {
 				const index = Math.round(num(o, 'index', 1))
 				const dst = readChannel(o, 'dest')
 				reg(mixPath(index, dst))
+				ask({ op: 'get_mix_assign', index, dest_type: dst.type, dest_index: dst.index }, mixPath(index, dst))
 				return link.state.mixAssigned(index, dst) === true
 			}, false),
 			unsubscribe,
@@ -268,15 +311,16 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 		send_level: {
 			type: 'value',
 			name: 'Send level',
-			description: 'dB, or raw 0–127 if "Show send levels in dB" is turned off in the connection settings',
+			description: `dB, or raw 0-127 if "Show send levels in dB" is turned off in the connection settings. ${LOCAL_ONLY}`,
 			options: [
 				...channelFields({ types: CHOICES_SEND_SOURCE, label: 'From' }),
 				...channelFields({ types: CHOICES_SEND_DEST, prefix: 'dest', label: 'To', defaultType: 'mono_aux' }),
 			],
-			callback: watch((o, reg) => {
+			callback: watch((o, reg, ask) => {
 				const src = readChannel(o)
 				const dst = readChannel(o, 'dest')
 				reg(sendPath(src, dst))
+				ask({ op: 'get_send_level', ...src, dest_type: dst.type, dest_index: dst.index }, sendPath(src, dst))
 				const lv = link.state.sendLevel(src, dst)
 				if (lv === undefined) return null
 				if (!ctx.config.sendsInDb) return lv
@@ -288,11 +332,13 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 		hpf_on: {
 			type: 'boolean',
 			name: 'HPF is on',
+			description: LOCAL_ONLY,
 			defaultStyle: { bgcolor: AMBER, color: BLACK },
 			options: [{ type: 'number', id: 'index', label: 'Input', default: 1, min: 1, max: 128 }],
-			callback: watch((o, reg) => {
+			callback: watch((o, reg, ask) => {
 				const ref: ChannelRef = { type: 'input', index: Math.round(num(o, 'index', 1)) }
 				reg(paramPath(ref, PARAM_HPF_ON))
+				ask({ op: 'get_param', ...ref, param: PARAM_HPF_ON }, paramPath(ref, PARAM_HPF_ON))
 				return link.state.strip(ref).params.get(PARAM_HPF_ON) === 1
 			}, false),
 			unsubscribe,
@@ -300,11 +346,13 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 		preamp_48v: {
 			type: 'boolean',
 			name: 'Preamp 48 V is on',
+			description: LOCAL_ONLY,
 			defaultStyle: { bgcolor: RED, color: WHITE },
 			options: [...socketFields()],
-			callback: watch((o, reg) => {
+			callback: watch((o, reg, ask) => {
 				const sock = readSocket(o)
 				reg(preampPath('48v', sock))
+				ask({ op: 'get_preamp_48v', ...sock }, preampPath('48v', sock))
 				return link.state.socket(sock).phantom === true
 			}, false),
 			unsubscribe,
@@ -312,11 +360,13 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 		preamp_pad: {
 			type: 'boolean',
 			name: 'Preamp pad is on',
+			description: LOCAL_ONLY,
 			defaultStyle: { bgcolor: AMBER, color: BLACK },
 			options: [...socketFields()],
-			callback: watch((o, reg) => {
+			callback: watch((o, reg, ask) => {
 				const sock = readSocket(o)
 				reg(preampPath('pad', sock))
+				ask({ op: 'get_preamp_pad', ...sock }, preampPath('pad', sock))
 				return link.state.socket(sock).pad === true
 			}, false),
 			unsubscribe,
@@ -324,10 +374,12 @@ export function buildFeedbacks(ctx: ModuleContext): CompanionFeedbackDefinitions
 		preamp_gain: {
 			type: 'value',
 			name: 'Preamp gain (dB)',
+			description: LOCAL_ONLY,
 			options: [...socketFields()],
-			callback: watch((o, reg) => {
+			callback: watch((o, reg, ask) => {
 				const sock = readSocket(o)
 				reg(preampPath('gain', sock))
+				ask({ op: 'get_preamp_gain', ...sock }, preampPath('gain', sock))
 				const v = link.state.socket(sock).gain
 				if (v === undefined) return null
 				const r = ctx.config.preampGainRange === 'legacy' ? { min: -10, max: 50 } : { min: 5, max: 60 }

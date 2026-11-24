@@ -17,8 +17,14 @@ export class SubscriptionRegistry {
 	private readonly byPath = new Map<string, Set<string>>()
 	private generation = 0
 
-	/** Record that feedback `id` currently depends on `paths` (replaces its previous set). */
-	touch(id: string, paths: Iterable<string>): void {
+	/**
+	 * Record that feedback `id` currently depends on `paths` (replaces its
+	 * previous set). True when that set actually changed: a newly placed
+	 * feedback, one whose options were edited, or any of them after a
+	 * reconnect, which clears the registry. That is the moment — and the only
+	 * moment — to prime the value behind a path with a Get.
+	 */
+	touch(id: string, paths: Iterable<string>): boolean {
 		const next = new Set(paths)
 		const prev = this.byFeedback.get(id)
 		if (prev) {
@@ -29,7 +35,7 @@ export class SubscriptionRegistry {
 						same = false
 						break
 					}
-			if (same) return
+			if (same) return false
 			for (const p of prev) this.unlink(p, id)
 		}
 		this.byFeedback.set(id, next)
@@ -39,6 +45,7 @@ export class SubscriptionRegistry {
 			set.add(id)
 		}
 		this.generation++
+		return true
 	}
 
 	remove(id: string): void {

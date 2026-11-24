@@ -2,6 +2,27 @@
 
 ## Unreleased (1.1.9x test line, not for the store)
 
+- **A feedback the bridge cannot answer now says so.** Nine of the module's
+  21 feedbacks read the param family — the three assigns, mix assign, send
+  level, HPF and the three preamps — and Client API v1 has no mirror path
+  for any of them, so in bridge mode they only ever reflect what this module
+  itself set. That limitation is real and companion/HELP.md has always
+  stated it; what it also promised was that the limitation is _visible_, in
+  `$(<label>:unsupported_gets)`. It was not. The only thing that filled that
+  variable was `BridgeLink.query()`, and nothing but an **action** ever
+  called it — a feedback just registered its path. So an operator who put an
+  "HPF is on" feedback on a button got a button stuck at false, an empty
+  diagnostic variable and not one line in the log. Reported by a customer on
+  1.1.2 (23 Nov 2026) as "all the companion feedbacks that pull actual
+  values from the console don't seem to be working", having found the HPF
+  and then the assign. Each of the nine now asks for its value when its
+  subscription is new — on placing the feedback, on editing its options, and
+  after a reconnect — which in bridge mode sends nothing and records the op
+  instead, and in direct mode primes the feedback from the desk. Each also
+  carries the limitation in its own description, so it reads in the picker
+  before a button is built on it. The mirror paths themselves are the
+  bridge's to add; nothing here changes what the module can know.
+
 - **Show Recorder's view keys: 31 more controls** (#704, #705). Its side
   panel's seven sections, each as a key that lights while the section shows
   and a second key that pops the same section into its own window; the four
