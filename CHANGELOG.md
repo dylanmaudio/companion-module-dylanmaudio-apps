@@ -2,6 +2,17 @@
 
 ## Unreleased (1.1.9x test line, not for the store)
 
+- **Show Recorder's view keys: 31 more controls** (#704, #705). Its side
+  panel's seven sections, each as a key that lights while the section shows
+  and a second key that pops the same section into its own window; the four
+  pages (Tracks, Patch Matrix, Mixer, Processing); meters, zoom, track
+  height, arm and disarm all, add region, find songs, sync from the console,
+  and recall scenes in playback. The last one carries the red bar and lights
+  amber, not green: the app calls it show-critical while it is on, because
+  playback then moves the desk by itself. The fixture came from the monorepo
+  by the usual sync; tx.json, rx.json and protocol.md were identical first,
+  so nothing was promoted upstream.
+
 - **The log stops saying a console it doesn't know means dLive only.** A
   console Console Bridge drives but this version hasn't been checked against
   now reads "has not been checked against one" — the module drives seven

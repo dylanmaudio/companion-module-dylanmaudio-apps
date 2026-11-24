@@ -1,7 +1,7 @@
 {
   "schema": "dylanmaudio-control-fixtures/1",
   "source": "docs/brief-companion-control.md §2 (2026-09-11); server shared/control_api.py",
-  "note": "Authority for the Companion control API wire shapes (/ctl/v1/), BOTH sides: the monorepo builds a real ControlServer from 'app' + 'catalogue' + 'initial_state' and replays 'cases' in order; the Companion module mocks the server from the same file (vendored by tools/sync_fixtures.sh, monorepo -> module repo, like fixtures/api/). The replay harness's handlers record every call, return the text in 'refusals' as {\"error\": text}, and on success publish the resolved value to the control's state key, as an app would. 'setup' sets the app's two switches before a case (defaults: allowed true, locked false). 'calls' asserts the handler invocations a case makes, as [control, value] pairs. Matching: response bodies are SUBSET-matched (extra server keys allowed); '<str>'/'<int>' match any value of that type. The catalogue itself must serialise EXACTLY as written here. Never edit a case to make a test green — change the brief first, then both sides.",
+  "note": "Authority for the Companion control API wire shapes (/ctl/v1/), BOTH sides: the monorepo builds a real ControlServer from 'app' + 'catalogue' + 'initial_state' and replays 'cases' in order; the Companion module mocks the server from the same file (vendored by tools/sync_fixtures.sh, monorepo -> module repo, like fixtures/api/). The replay harness's handlers record every call, return the text in 'refusals' as {\"error\": text}, and on success publish the resolved value to the control's state key, as an app would. 'setup' sets the app's two switches before a case (defaults: allowed true, locked false). 'calls' asserts the handler invocations a case makes, as [control, value] pairs. Matching: response bodies are SUBSET-matched (extra server keys allowed); '<str>'/'<int>' match any value of that type. The catalogue itself must serialise EXACTLY as written here. A case with 'peer': 'lan' is a request from another computer to a server that lets other computers in (Console Bridge on the LAN); '<token>' in its headers is that server's token. Never edit a case to make a test green — change the brief first, then both sides.",
   "app": {"id": "demo", "name": "Demo App", "version": "1.0.0"},
   "catalogue": {
     "controls": [
@@ -146,6 +146,21 @@
      "request": {"method": "GET", "path": "/ctl/v1/info", "headers": {"Host": "attacker.example"}},
      "response": {"status": 403, "body": {"ok": false, "error": {"code": "forbidden_host"}}},
      "note": "DNS rebinding: a hostname that resolves to 127.0.0.1 must still be refused."},
+    {"id": "security.lan.token_required", "peer": "lan",
+     "request": {"method": "GET", "path": "/ctl/v1/info"},
+     "response": {"status": 401, "body": {"ok": false, "error": {"code": "token_required"}}},
+     "note": "Console Bridge on the LAN: another computer needs the token on every request, /info included."},
+    {"id": "security.lan.bad_token", "peer": "lan",
+     "request": {"method": "GET", "path": "/ctl/v1/info", "headers": {"Authorization": "Bearer not-the-token"}},
+     "response": {"status": 401, "body": {"ok": false, "error": {"code": "bad_token"}}}},
+    {"id": "security.lan.cmd.no_token", "peer": "lan",
+     "request": {"method": "POST", "path": "/ctl/v1/cmd", "body": {"v": 1, "cid": "c30", "control": "demo.run", "value": "on"}},
+     "response": {"status": 401, "body": {"ok": false, "error": {"code": "token_required"}}},
+     "calls": [],
+     "note": "Without the token no control runs."},
+    {"id": "security.lan.info", "peer": "lan",
+     "request": {"method": "GET", "path": "/ctl/v1/info", "headers": {"Authorization": "Bearer <token>", "Host": "bridge-mac.local:8770"}},
+     "response": {"status": 200, "body": {"v": 1, "ctl": 1}}},
     {"id": "not_found",
      "request": {"method": "GET", "path": "/ctl/v1/nope"},
      "response": {"status": 404, "body": {"ok": false, "error": {"code": "not_found"}}}}

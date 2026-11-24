@@ -1,7 +1,7 @@
 {
   "schema": "dlive-api-fixtures/1",
   "source": "docs/bridge-client-api-v1.md (accepted 2026-08-25; amended 2026-09-07, spec 1a: broadcast-driven mirror 1.2)",
-  "note": "Authority for the Client API wire shapes, BOTH sides: the monorepo server replays requests and asserts responses; the Companion module mocks the server from the same file (vendored by tools/sync_fixtures.sh, monorepo -> module repo — the REVERSE of the protocol fixtures). Matching rules: response bodies are SUBSET-matched (extra server keys are allowed — additive changes don't bump v1, spec §11); '<str>'/'<int>' match any value of that type; '<lane>' is substituted with the lane_id registered by the most recent hello case; a case with 'family' runs against that console's server (with 'codec': true, its codec too; with 'model', the desk has said it is that model; with 'desk', it has first heard those events from its desk, as its driver decodes them), a release build's, and its '<lane>' is the lane the last hello on that server registered; 'sends' asserts the exact console-bound hex the request must produce. A request's 'headers' and 'content_type' are sent as given (a body is sent as application/json unless 'content_type' says otherwise); an empty 'sends' asserts that nothing reached the console. A case's 'acks' lists the acks the stream must carry after its request (#602): subset-matched, in any order, within 5 s, such as a fade's when it lands or stops and a query's when its Gets are answered or time out. Its 'sends' are checked once they have come. A case with 'console': 'down' runs against a dLive server whose console link is down, so every write to it fails; its '<lane>' is the lane the last hello on that server registered. Never edit a case to make a test green — change the spec first, then both sides.",
+  "note": "Authority for the Client API wire shapes, BOTH sides: the monorepo server replays requests and asserts responses; the Companion module mocks the server from the same file (vendored by tools/sync_fixtures.sh, monorepo -> module repo — the REVERSE of the protocol fixtures). Matching rules: response bodies are SUBSET-matched (extra server keys are allowed — additive changes don't bump v1, spec §11); '<str>'/'<int>' match any value of that type; '<lane>' is substituted with the lane_id registered by the most recent hello case; a case with 'family' runs against that console's server (with 'codec': true, its codec too; with 'model', the desk has said it is that model; with 'desk', it has first heard those events from its desk, as its driver decodes them), a release build's, and its '<lane>' is the lane the last hello on that server registered; 'sends' asserts the exact console-bound hex the request must produce. A request's 'headers' and 'content_type' are sent as given (a body is sent as application/json unless 'content_type' says otherwise); an empty 'sends' asserts that nothing reached the console. A case's 'acks' lists the acks the stream must carry after its request (#602): subset-matched, in any order, within 5 s, such as a fade's when it lands or stops and a query's when its Gets are answered or time out. Its 'sends' are checked once they have come. A case with 'console': 'down' runs against a dLive server whose console link is down, so every write to it fails; its '<lane>' is the lane the last hello on that server registered. A case with 'peer': 'lan' is a request from another computer to a dLive server that lets other computers in (Console Bridge on the LAN, spec §4); '<token>' in its path or headers is that server's token, and its '<lane>' is the lane the last 'peer': 'lan' hello registered. Never edit a case to make a test green — change the spec first, then both sides.",
   "cases": [
     {
       "id": "info.ok",
@@ -301,6 +301,75 @@
         "ok": false, "error": {"code": "bad_content_type"}}},
       "sends": [],
       "note": "A cross-site page can send text/plain without a preflight; application/json it cannot."
+    },
+    {
+      "id": "security.lan.token_required",
+      "peer": "lan",
+      "request": {"method": "GET", "path": "/api/v1/info"},
+      "response": {"status": 401, "body": {
+        "ok": false, "error": {"code": "token_required"}}},
+      "note": "Console Bridge on the LAN (spec §4): another computer needs the token on every request, /info included."
+    },
+    {
+      "id": "security.lan.bad_token",
+      "peer": "lan",
+      "request": {"method": "GET", "path": "/api/v1/info",
+        "headers": {"Authorization": "Bearer not-the-token"}},
+      "response": {"status": 401, "body": {
+        "ok": false, "error": {"code": "bad_token"}}},
+      "note": "A wrong token is told apart from none, so Companion can say which; the reply never repeats what was sent."
+    },
+    {
+      "id": "security.lan.url_token",
+      "peer": "lan",
+      "request": {"method": "GET", "path": "/api/v1/info?token=<token>"},
+      "response": {"status": 401, "body": {
+        "ok": false, "error": {"code": "token_required"}}},
+      "note": "No ?token= (DEV: ROADMAP, 21 Nov 2026): a token in a URL ends up in logs and histories. The Authorization header only."
+    },
+    {
+      "id": "security.lan.info",
+      "peer": "lan",
+      "request": {"method": "GET", "path": "/api/v1/info",
+        "headers": {"Authorization": "Bearer <token>", "Host": "bridge-mac.local:8765"}},
+      "response": {"status": 200, "body": {"v": 1, "session": "main", "api": 1}},
+      "note": "With the token, any Host: the peer reached a real address, and the token is the gate."
+    },
+    {
+      "id": "security.lan.hello",
+      "peer": "lan",
+      "request": {"method": "POST", "path": "/api/v1/hello",
+        "headers": {"Authorization": "Bearer <token>"},
+        "body": {"v": 1, "session": "main", "name": "Companion on a Pi", "kind": "companion"}},
+      "response": {"status": 200, "body": {"v": 1, "session": "main", "lane_id": "<str>"}}
+    },
+    {
+      "id": "security.lan.cmd.no_token",
+      "peer": "lan",
+      "request": {"method": "POST", "path": "/api/v1/cmd",
+        "body": {"lane_id": "<lane>", "cid": "fx11", "intent": {"op": "raw", "hex": "9b 00 7f"}}},
+      "response": {"status": 401, "body": {
+        "ok": false, "error": {"code": "token_required"}}},
+      "sends": [],
+      "note": "A lane id alone is not enough: without the token nothing reaches the console."
+    },
+    {
+      "id": "security.lan.origin",
+      "peer": "lan",
+      "request": {"method": "GET", "path": "/api/v1/info",
+        "headers": {"Authorization": "Bearer <token>", "Origin": "http://some-website.example"}},
+      "response": {"status": 403, "body": {
+        "ok": false, "error": {"code": "forbidden_origin"}}},
+      "note": "A web page is refused from another computer too, token or not."
+    },
+    {
+      "id": "security.lan.local_only",
+      "peer": "lan",
+      "request": {"method": "GET", "path": "/status",
+        "headers": {"Authorization": "Bearer <token>"}},
+      "response": {"status": 403, "body": {
+        "ok": false, "error": {"code": "local_only"}}},
+      "note": "The MIDI Monitor's page, /events, /status and the log actions stay on this computer: they answer Access-Control-Allow-Origin: *."
     },
     {
       "id": "hello.digico",

@@ -159,6 +159,55 @@ const looks: [string, KeyLook][] = [
 	// toggle's green. "MASTER OUT" on one line is wider than the key allows.
 	['sr.master_out_mute', { text: 'MASTER\nMUTE', glyph: GLYPH.mute, on: KEY.alarm }],
 
+	// Show Recorder's view keys (#704, #705). Three families, each with its own
+	// shape so a deck of them can be read at arm's length:
+	//
+	// - a section of the side panel is its own name, and lights while it shows;
+	// - the same section in its own window is "<section> WINDOW", so the pair
+	//   reads as one thing in two places rather than two unrelated keys;
+	// - a page is "<page> PAGE", which keeps MATRIX (the Patch Matrix page)
+	//   from reading as PATCH (the side panel's section).
+	//
+	// These are nouns — a place to look, not a thing done — so they carry no
+	// glyph; the transport keys beside them keep theirs.
+	['sr.side_panel', { text: 'SIDE\nPANEL' }],
+	['sr.side_recording', { text: 'RECORDING' }],
+	['sr.side_marks', { text: 'MARKS &\nREGIONS' }],
+	['sr.side_patch', { text: 'PATCH' }],
+	['sr.side_scenes', { text: 'CONSOLE\nSCENES' }],
+	['sr.side_checks', { text: 'BEFORE\nYOU REC' }],
+	['sr.side_inputs', { text: 'INPUTS' }],
+	['sr.side_foh', { text: 'FOH\nMETER' }],
+	['sr.side_recording_window', { text: 'REC\nWINDOW' }],
+	['sr.side_marks_window', { text: 'MARKS\nWINDOW' }],
+	['sr.side_patch_window', { text: 'PATCH\nWINDOW' }],
+	['sr.side_scenes_window', { text: 'SCENES\nWINDOW' }],
+	['sr.side_checks_window', { text: 'CHECKS\nWINDOW' }],
+	['sr.side_inputs_window', { text: 'INPUTS\nWINDOW' }],
+	['sr.side_foh_window', { text: 'FOH\nWINDOW' }],
+	['sr.show_all_sections', { text: 'SHOW ALL\nSECTIONS' }],
+	['sr.meters', { text: 'METERS' }],
+	['sr.page_tracks', { text: 'TRACKS\nPAGE' }],
+	['sr.page_matrix', { text: 'MATRIX\nPAGE' }],
+	['sr.page_mixer', { text: 'MIXER\nPAGE' }],
+	['sr.page_processing', { text: 'PROCESS\nPAGE' }],
+	['sr.zoom_in', { text: 'ZOOM\nIN' }],
+	['sr.zoom_out', { text: 'ZOOM\nOUT' }],
+	['sr.taller', { text: 'TRACKS\nTALLER' }],
+	['sr.shorter', { text: 'TRACKS\nSHORTER' }],
+	['sr.arm_all', { text: 'ARM ALL' }],
+	['sr.disarm_all', { text: 'DISARM\nALL' }],
+	// A region is drawn between two markers, so it wears the marker's diamond.
+	['sr.add_region', { text: 'ADD\nREGION', glyph: GLYPH.marker }],
+	['sr.find_songs', { text: 'FIND\nSONGS' }],
+	// Reading the desk, not writing to it: the refresh arrow, not RESET's.
+	['sr.sync_console', { text: 'SYNC\nCONSOLE', glyph: GLYPH.loop }],
+	// The app calls this one show-critical while it is ON, so the key carries
+	// the red bar from the catalogue. Amber for armed, as Pilot Tone's Latch:
+	// green would say "fine", and what it means is that playback will move the
+	// desk on its own.
+	['sr.scene_recall', { text: 'RECALL\nSCENES', on: KEY.attention }],
+
 	['cxc.play', { text: 'PLAY', glyph: GLYPH.play, lit: [{ key: TRANSPORT, value: 'playing', bg: KEY.on }] }],
 	['cxc.stop', { text: 'STOP', glyph: GLYPH.stop }],
 	['cxc.go-to-start', { text: 'TO\nSTART', glyph: GLYPH.toStart }],

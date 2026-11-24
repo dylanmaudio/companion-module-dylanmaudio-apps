@@ -85,10 +85,220 @@
         "label": "Mute Master Out",
         "kind": "toggle",
         "state": "sr.master_out_muted",
+        "group": "outputs",
         "safety": {
           "off": "critical"
-        },
-        "group": "outputs"
+        }
+      },
+      {
+        "id": "sr.side_panel",
+        "label": "Side panel",
+        "kind": "toggle",
+        "state": "sr.side_panel",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_recording",
+        "label": "Recording section",
+        "kind": "toggle",
+        "state": "sr.side_recording",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_marks",
+        "label": "Markers & Regions section",
+        "kind": "toggle",
+        "state": "sr.side_marks",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_patch",
+        "label": "Patch section",
+        "kind": "toggle",
+        "state": "sr.side_patch",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_scenes",
+        "label": "Console Scenes section",
+        "kind": "toggle",
+        "state": "sr.side_scenes",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_checks",
+        "label": "Before You Record section",
+        "kind": "toggle",
+        "state": "sr.side_checks",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_inputs",
+        "label": "Interface Inputs section",
+        "kind": "toggle",
+        "state": "sr.side_inputs",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_foh",
+        "label": "FOH Meter section",
+        "kind": "toggle",
+        "state": "sr.side_foh",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_recording_window",
+        "label": "Recording in its own window",
+        "kind": "toggle",
+        "state": "sr.side_recording_window",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_marks_window",
+        "label": "Markers & Regions in its own window",
+        "kind": "toggle",
+        "state": "sr.side_marks_window",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_patch_window",
+        "label": "Patch in its own window",
+        "kind": "toggle",
+        "state": "sr.side_patch_window",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_scenes_window",
+        "label": "Console Scenes in its own window",
+        "kind": "toggle",
+        "state": "sr.side_scenes_window",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_checks_window",
+        "label": "Before You Record in its own window",
+        "kind": "toggle",
+        "state": "sr.side_checks_window",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_inputs_window",
+        "label": "Interface Inputs in its own window",
+        "kind": "toggle",
+        "state": "sr.side_inputs_window",
+        "group": "view"
+      },
+      {
+        "id": "sr.side_foh_window",
+        "label": "FOH Meter in its own window",
+        "kind": "toggle",
+        "state": "sr.side_foh_window",
+        "group": "view"
+      },
+      {
+        "id": "sr.show_all_sections",
+        "label": "Show all sections",
+        "kind": "action",
+        "group": "view"
+      },
+      {
+        "id": "sr.meters",
+        "label": "Meters (wherever they're docked)",
+        "kind": "toggle",
+        "state": "sr.meters",
+        "group": "view"
+      },
+      {
+        "id": "sr.page_tracks",
+        "label": "Tracks page",
+        "kind": "toggle",
+        "state": "sr.page_tracks",
+        "group": "view"
+      },
+      {
+        "id": "sr.page_matrix",
+        "label": "Patch Matrix page",
+        "kind": "toggle",
+        "state": "sr.page_matrix",
+        "group": "view"
+      },
+      {
+        "id": "sr.page_mixer",
+        "label": "Mixer page",
+        "kind": "toggle",
+        "state": "sr.page_mixer",
+        "group": "view"
+      },
+      {
+        "id": "sr.page_processing",
+        "label": "Processing page",
+        "kind": "toggle",
+        "state": "sr.page_processing",
+        "group": "view"
+      },
+      {
+        "id": "sr.zoom_in",
+        "label": "Zoom in",
+        "kind": "action",
+        "group": "view"
+      },
+      {
+        "id": "sr.zoom_out",
+        "label": "Zoom out",
+        "kind": "action",
+        "group": "view"
+      },
+      {
+        "id": "sr.taller",
+        "label": "Tracks taller",
+        "kind": "action",
+        "group": "view"
+      },
+      {
+        "id": "sr.shorter",
+        "label": "Tracks shorter",
+        "kind": "action",
+        "group": "view"
+      },
+      {
+        "id": "sr.arm_all",
+        "label": "Arm all tracks",
+        "kind": "action",
+        "group": "tracks"
+      },
+      {
+        "id": "sr.disarm_all",
+        "label": "Disarm all tracks",
+        "kind": "action",
+        "group": "tracks"
+      },
+      {
+        "id": "sr.add_region",
+        "label": "Add region (marker to marker)",
+        "kind": "action",
+        "group": "markers"
+      },
+      {
+        "id": "sr.find_songs",
+        "label": "Find songs…",
+        "kind": "action",
+        "group": "markers"
+      },
+      {
+        "id": "sr.sync_console",
+        "label": "Sync from Console",
+        "kind": "action",
+        "group": "console"
+      },
+      {
+        "id": "sr.scene_recall",
+        "label": "Recall scenes in playback",
+        "kind": "toggle",
+        "state": "sr.scene_recall",
+        "group": "console",
+        "safety": {
+          "on": "critical"
+        }
       }
     ],
     "state": [
@@ -152,6 +362,111 @@
         "key": "sr.master_out_muted",
         "label": "Master Out muted",
         "type": "bool"
+      },
+      {
+        "key": "sr.side_panel",
+        "label": "Side panel open",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_recording",
+        "label": "Recording section shown",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_marks",
+        "label": "Markers & Regions section shown",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_patch",
+        "label": "Patch section shown",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_scenes",
+        "label": "Console Scenes section shown",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_checks",
+        "label": "Before You Record section shown",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_inputs",
+        "label": "Interface Inputs section shown",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_foh",
+        "label": "FOH Meter section shown",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_recording_window",
+        "label": "Recording in its own window",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_marks_window",
+        "label": "Markers & Regions in its own window",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_patch_window",
+        "label": "Patch in its own window",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_scenes_window",
+        "label": "Console Scenes in its own window",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_checks_window",
+        "label": "Before You Record in its own window",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_inputs_window",
+        "label": "Interface Inputs in its own window",
+        "type": "bool"
+      },
+      {
+        "key": "sr.side_foh_window",
+        "label": "FOH Meter in its own window",
+        "type": "bool"
+      },
+      {
+        "key": "sr.meters",
+        "label": "Meters open",
+        "type": "bool"
+      },
+      {
+        "key": "sr.page_tracks",
+        "label": "Tracks page showing",
+        "type": "bool"
+      },
+      {
+        "key": "sr.page_matrix",
+        "label": "Patch Matrix page showing",
+        "type": "bool"
+      },
+      {
+        "key": "sr.page_mixer",
+        "label": "Mixer page showing",
+        "type": "bool"
+      },
+      {
+        "key": "sr.page_processing",
+        "label": "Processing page showing",
+        "type": "bool"
+      },
+      {
+        "key": "sr.scene_recall",
+        "label": "Recall scenes in playback",
+        "type": "bool"
       }
     ]
   },
@@ -166,7 +481,28 @@
     "sr.window_open": false,
     "sr.session": "",
     "sr.dirty": false,
-    "sr.master_out_muted": false
+    "sr.master_out_muted": false,
+    "sr.side_panel": null,
+    "sr.side_recording": null,
+    "sr.side_marks": null,
+    "sr.side_patch": null,
+    "sr.side_scenes": null,
+    "sr.side_checks": null,
+    "sr.side_inputs": null,
+    "sr.side_foh": null,
+    "sr.side_recording_window": null,
+    "sr.side_marks_window": null,
+    "sr.side_patch_window": null,
+    "sr.side_scenes_window": null,
+    "sr.side_checks_window": null,
+    "sr.side_inputs_window": null,
+    "sr.side_foh_window": null,
+    "sr.meters": null,
+    "sr.page_tracks": null,
+    "sr.page_matrix": null,
+    "sr.page_mixer": null,
+    "sr.page_processing": null,
+    "sr.scene_recall": null
   },
   "cases": [
     {
@@ -563,6 +899,292 @@
       },
       "calls": [],
       "note": "Export opens a dialog and is deliberately not a control."
+    },
+    {
+      "id": "cmd.marker.blank",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k20",
+          "control": "sr.marker",
+          "value": ""
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ok": true,
+          "cid": "k20",
+          "control": "sr.marker",
+          "value": ""
+        }
+      },
+      "calls": [
+        [
+          "add_marker",
+          0.0,
+          ""
+        ]
+      ],
+      "note": "A blank name is valid: the app names it 'Marker N' (the module's Add Marker key sends '')."
+    },
+    {
+      "id": "cmd.page_mixer.on",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k21",
+          "control": "sr.page_mixer",
+          "value": true
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ok": true,
+          "cid": "k21",
+          "control": "sr.page_mixer",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "page_menu",
+          "act:view_mixer"
+        ]
+      ]
+    },
+    {
+      "id": "cmd.page_mixer.off",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k22",
+          "control": "sr.page_mixer",
+          "value": false
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ok": true,
+          "cid": "k22",
+          "control": "sr.page_mixer",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "page_menu",
+          "act:view_tracks"
+        ]
+      ],
+      "note": "A page off goes back to Tracks."
+    },
+    {
+      "id": "cmd.side_patch.off",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k23",
+          "control": "sr.side_patch",
+          "value": false
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ok": true,
+          "cid": "k23",
+          "control": "sr.side_patch",
+          "value": false
+        }
+      },
+      "calls": [
+        [
+          "set_side",
+          "patch",
+          false,
+          null
+        ]
+      ]
+    },
+    {
+      "id": "cmd.side_foh_window.on",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k24",
+          "control": "sr.side_foh_window",
+          "value": true
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ok": true,
+          "cid": "k24",
+          "control": "sr.side_foh_window",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "set_side",
+          "foh",
+          null,
+          true
+        ]
+      ]
+    },
+    {
+      "id": "cmd.meters.on",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k25",
+          "control": "sr.meters",
+          "value": true
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ok": true,
+          "cid": "k25",
+          "control": "sr.meters",
+          "value": true
+        }
+      },
+      "calls": [
+        [
+          "set_meters",
+          true
+        ]
+      ]
+    },
+    {
+      "id": "cmd.arm_all",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k26",
+          "control": "sr.arm_all"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ok": true,
+          "cid": "k26",
+          "control": "sr.arm_all"
+        }
+      },
+      "calls": [
+        [
+          "arm_all",
+          true
+        ]
+      ]
+    },
+    {
+      "id": "cmd.disarm_all",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k27",
+          "control": "sr.disarm_all"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ok": true,
+          "cid": "k27",
+          "control": "sr.disarm_all"
+        }
+      },
+      "calls": [
+        [
+          "arm_all",
+          false
+        ]
+      ]
+    },
+    {
+      "id": "cmd.find_songs",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k28",
+          "control": "sr.find_songs"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "v": 1,
+          "ok": true,
+          "cid": "k28",
+          "control": "sr.find_songs"
+        }
+      },
+      "calls": [
+        [
+          "page_menu",
+          "find-songs"
+        ]
+      ]
+    },
+    {
+      "id": "cmd.add_region.no_markers",
+      "request": {
+        "method": "POST",
+        "path": "/ctl/v1/cmd",
+        "body": {
+          "v": 1,
+          "cid": "k29",
+          "control": "sr.add_region"
+        }
+      },
+      "response": {
+        "status": 409,
+        "body": {
+          "ok": false,
+          "cid": "k29",
+          "error": {
+            "code": "refused"
+          }
+        }
+      },
+      "calls": [],
+      "note": "No marker before and after the playhead: refused in the app's words."
     }
   ]
 }
