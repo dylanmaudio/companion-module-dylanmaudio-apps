@@ -2,12 +2,13 @@
 	"schema": "session-protocol/1",
 	"family": "dlive",
 	"title": "Companion 1.2.0-rc.1 on the tour's dLive: the 1.2.0 submission check (desk list B2)",
-	"version": "2026-11-24 draft 1 (Dev: Bitfocus Companion module, for the UK rehearsal days 26-27 Nov; module 1.2.0-rc.1, Console Bridge 1.5.0-beta.5)",
+	"version": "2026-11-24 draft 2 (Dev: Bitfocus Companion module, for the UK rehearsal days 26-27 Nov; module 1.2.0-rc.1, Console Bridge 1.5.0-beta.5). Draft 2 takes the operator's flight-list §10 answers of 24 Nov: the desk is theirs from load-in to load-out, the PA is off for a couple of hours before each show and they can mute their own system controller anyway, a test show can be loaded, and the Mac Mini comes off the network while this runs.",
 	"sources": [
 		"blocks/co-dlive.json (the shop's dLive, 4 Nov 2026) -- this block is its tour revision",
 		"sim/captures/2026-11-04-dlive-signoff-dlive/RESULTS.md (the Companion row: cold state, SAFE9, scene by place, #342)",
 		"docs/status/console-checklist.md (the Athens list; the dLive re-check rows)",
-		"the module at 48387d7 on build/sr-1.2.0; CHANGELOG.md's Unreleased section for what is new since 4 Nov"
+		"the module at 48387d7 on build/sr-1.2.0; CHANGELOG.md's Unreleased section for what is new since 4 Nov",
+		"the operator's flight list §10 answers, 24 Nov 2026 (via DEV: ROADMAP)"
 	],
 	"tests": [
 		{
@@ -17,11 +18,11 @@
 			"answers": "the module thread, before the 3 Dec submission: is everything 1.2.0 added since the last real dLive (4 Nov) invisible on a dLive? The console gate, the forgotten-value rule, the fade-ack warnings and the rename.",
 			"expect": "The gate is silent: no refusal line of any kind in Companion's log. Every write lands and reads back. A fade that lands warns about nothing. After a recall the strip variables are stale, never empty. scene_current survives a connection toggle (#342). The cold state agrees with the surface, with the stereo trio empty, which is a dLive's right answer.",
 			"record": "see the closing note",
-			"safety": "This is the tour's show desk, not a test desk. Every write is on ONE input the operator names as having no source, no output patch and no main assign, with the PA off or muted, on a COPY of the show. If no input can be named, the block runs read-only and the reading half still counts. Scene recalls happen only on places the operator names as safe, and the operator puts the desk back at the surface. Nothing runs on the Mac Mini: the module under test is installed on the MacBook Pro. Nothing goes on the desk's network until the operator says it is up.",
+			"safety": "This is the tour's show desk, not a test desk, but it is the operator's alone from load-in to load-out (§10, 24 Nov). WRITES go in the couple of hours before the PA is connected; outside that window the operator mutes their own system controller first, and says so before a write. The show is a test show if one is loaded, otherwise a COPY of the main show -- never the show itself. Every write is on ONE input the operator names as having no source, no output patch and no main assign; if none can be named the block runs read-only, and the reading half still counts. Scene recalls happen only on places the operator names, and the operator puts the desk back at the surface. The module under test runs on the MacBook Pro; the Mac Mini is OFF THE NETWORK for the run, so the show machine's own connections are not on the desk meanwhile. A new connection to the desk asks the operator on the day.",
 			"steps": [
 				{
 					"do": "note",
-					"prompt": "BEFORE THE DESK, on the MacBook Pro, not the show Mac Mini. (a) Install the module: Companion -> Modules -> 'Import module package' -> 'Companion Module 1.2.0-rc.1.tgz' from Latest Builds/Betas. NOT the button below it, 'Import offline module bundle'. (b) On the dylanmaudio connection: the pencil by Module Version -> v1.2.0-rc.1 -> Save. (c) Import the page: Buttons -> Import -> blocks/shop-check.companionconfig from the module repo, onto page 11. It carries 14 buttons: row 0 a channel's fader and mute, row 1 scenes by place, row 2 scenes by number. It was written for the shop's prepared show, where Input 9 was safe and the scenes were ours. NEITHER IS TRUE ON THE TOUR'S DESK. Step 2 settles which channel is safe, and row 0's five buttons must be re-pointed at it before anything is pressed: Buttons -> page 11 -> each button -> its action's Input number. Leave rows 1 and 2 alone until step 7 says otherwise."
+					"prompt": "BEFORE THE DESK, on the MacBook Pro. The Mac Mini is off the network for the run (§10), so nothing here touches the show machine. (a) Install the module: Companion -> Modules -> 'Import module package' -> 'Companion Module 1.2.0-rc.1.tgz' from Latest Builds/Betas. NOT the button below it, 'Import offline module bundle'. (b) On the dylanmaudio connection: the pencil by Module Version -> v1.2.0-rc.1 -> Save. (c) Import the page: Buttons -> Import -> blocks/shop-check.companionconfig from the module repo, onto page 11. It carries 14 buttons: row 0 a channel's fader and mute, row 1 scenes by place, row 2 scenes by number. It was written for the shop's prepared show, where Input 9 was safe and the scenes were ours. NEITHER IS TRUE ON THE TOUR'S DESK. Step 2 settles which channel is safe, and row 0's five buttons must be re-pointed at it before anything is pressed: Buttons -> page 11 -> each button -> its action's Input number. Leave rows 1 and 2 alone until step 7 says otherwise."
 				},
 				{
 					"do": "manual",
@@ -29,10 +30,10 @@
 				},
 				{
 					"do": "ask",
-					"question": "OPERATOR: Name the input that is safe to write to: no source patched, no output patched, no main assign. Is the PA off or muted, and is this a COPY of the show rather than the show itself? If you cannot name a safe input, say 'read-only' and the block runs its reading half alone, which is still a pass for that half.",
-					"choices": ["safe input named", "read-only", "stop"],
+					"question": "OPERATOR: three things before any write. (a) Is this a test show or a copy of the main show, rather than the show itself? (b) Is the PA disconnected, or have you muted your system controller? (c) Name the input that is safe to write to: no source patched, no output patched, no main assign. If you cannot name one, say 'read-only' and the block runs its reading half alone, which is still a pass for that half.",
+					"choices": ["all three answered", "read-only", "stop"],
 					"rehearse": {
-						"answer": "safe input named"
+						"answer": "all three answered"
 					}
 				},
 				{
@@ -49,7 +50,7 @@
 				},
 				{
 					"do": "manual",
-					"text": "CLAUDE, the writes. SKIP THIS STEP ENTIRELY if step 2 said read-only. Everything here is on the input the operator named, with the PA off or muted. In order, 2 s apart, after re-pointing row 0 at that input: curl -s -X POST http://127.0.0.1:8888/api/location/11/0/0/press (-20 dB); .../11/0/1/press (0 dB); .../11/0/3/press (MUTE on); .../11/0/4/press (MUTE off); .../11/0/2/press (-inf). After each, read it back: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch<N>/value and curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/mute_ch<N>/value for that input. Every one MUST land: a dLive is not a foreign family, so the module converts dB to the dLive's own scale itself and a refusal here is a real fail. The press endpoint answers 204 whether or not a button is there, so a 204 proves nothing; the read-back and the bridge's log are the proof. Put the fader back where the operator found it, by hand if the -inf press is not where it started."
+					"text": "CLAUDE, the writes. SKIP THIS STEP ENTIRELY if step 2 said read-only. Everything here is on the input the operator named, inside the PA-off window or with their system controller muted (step 2). In order, 2 s apart, after re-pointing row 0 at that input: curl -s -X POST http://127.0.0.1:8888/api/location/11/0/0/press (-20 dB); .../11/0/1/press (0 dB); .../11/0/3/press (MUTE on); .../11/0/4/press (MUTE off); .../11/0/2/press (-inf). After each, read it back: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch<N>/value and curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/mute_ch<N>/value for that input. Every one MUST land: a dLive is not a foreign family, so the module converts dB to the dLive's own scale itself and a refusal here is a real fail. The press endpoint answers 204 whether or not a button is there, so a 204 proves nothing; the read-back and the bridge's log are the proof. Put the fader back where the operator found it, by hand if the -inf press is not where it started."
 				},
 				{
 					"do": "manual",
