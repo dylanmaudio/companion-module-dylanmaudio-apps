@@ -1,6 +1,6 @@
 # Changelog — dylanmaudio-apps (Bitfocus Companion module)
 
-## Unreleased (1.1.9x test line, not for the store)
+## Unreleased — 1.2.0 (rc.2; the 3 Dec Bitfocus submission)
 
 - **A feedback the bridge cannot answer now says so.** Nine of the module's
   21 feedbacks read the param family — the three assigns, mix assign, send
