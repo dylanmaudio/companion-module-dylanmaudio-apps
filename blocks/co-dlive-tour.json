@@ -1,0 +1,89 @@
+{
+	"schema": "session-protocol/1",
+	"family": "dlive",
+	"title": "Companion 1.2.0-rc.1 on the tour's dLive: the 1.2.0 submission check (desk list B2)",
+	"version": "2026-11-24 draft 1 (Dev: Bitfocus Companion module, for the UK rehearsal days 26-27 Nov; module 1.2.0-rc.1, Console Bridge 1.5.0-beta.5)",
+	"sources": [
+		"blocks/co-dlive.json (the shop's dLive, 4 Nov 2026) -- this block is its tour revision",
+		"sim/captures/2026-11-04-dlive-signoff-dlive/RESULTS.md (the Companion row: cold state, SAFE9, scene by place, #342)",
+		"docs/status/console-checklist.md (the Athens list; the dLive re-check rows)",
+		"the module at 48387d7 on build/sr-1.2.0; CHANGELOG.md's Unreleased section for what is new since 4 Nov"
+	],
+	"tests": [
+		{
+			"id": "CO-TOUR",
+			"tier": "must",
+			"title": "Companion 1.2.0-rc.1 on the tour's dLive -- about 8 minutes, almost all of it over HTTP",
+			"answers": "the module thread, before the 3 Dec submission: is everything 1.2.0 added since the last real dLive (4 Nov) invisible on a dLive? The console gate, the forgotten-value rule, the fade-ack warnings and the rename.",
+			"expect": "The gate is silent: no refusal line of any kind in Companion's log. Every write lands and reads back. A fade that lands warns about nothing. After a recall the strip variables are stale, never empty. scene_current survives a connection toggle (#342). The cold state agrees with the surface, with the stereo trio empty, which is a dLive's right answer.",
+			"record": "see the closing note",
+			"safety": "This is the tour's show desk, not a test desk. Every write is on ONE input the operator names as having no source, no output patch and no main assign, with the PA off or muted, on a COPY of the show. If no input can be named, the block runs read-only and the reading half still counts. Scene recalls happen only on places the operator names as safe, and the operator puts the desk back at the surface. Nothing runs on the Mac Mini: the module under test is installed on the MacBook Pro. Nothing goes on the desk's network until the operator says it is up.",
+			"steps": [
+				{
+					"do": "note",
+					"prompt": "BEFORE THE DESK, on the MacBook Pro, not the show Mac Mini. (a) Install the module: Companion -> Modules -> 'Import module package' -> 'Companion Module 1.2.0-rc.1.tgz' from Latest Builds/Betas. NOT the button below it, 'Import offline module bundle'. (b) On the dylanmaudio connection: the pencil by Module Version -> v1.2.0-rc.1 -> Save. (c) Import the page: Buttons -> Import -> blocks/shop-check.companionconfig from the module repo, onto page 11. It carries 14 buttons: row 0 a channel's fader and mute, row 1 scenes by place, row 2 scenes by number. It was written for the shop's prepared show, where Input 9 was safe and the scenes were ours. NEITHER IS TRUE ON THE TOUR'S DESK. Step 2 settles which channel is safe, and row 0's five buttons must be re-pointed at it before anything is pressed: Buttons -> page 11 -> each button -> its action's Input number. Leave rows 1 and 2 alone until step 7 says otherwise."
+				},
+				{
+					"do": "manual",
+					"text": "CLAUDE, the build (nothing is sent). This is a packaged module, not the dev symlink the shop block used, so the version IS the identity and there is no SHA to read. Check: (a) ls ~/Library/Application\\ Support/companion/modules/ | grep dylanmaudio -> wants dylanmaudio-apps-1.2.0-rc.1; (b) shasum -a 256 of the .tgz you imported -> wants b1891c9fca013840a8b81dd408d472c2269fd259e6ca38b4d17f8613fd748512 (if it differs, someone cut another build with the same name: stop and say so); (c) curl -s http://127.0.0.1:8888/api/connections | python3 -m json.tool -> the dylanmaudio row's moduleVersionId reads 1.2.0-rc.1. RECORD all three, and the Console Bridge build (wants 1.5.0-beta.5)."
+				},
+				{
+					"do": "ask",
+					"question": "OPERATOR: Name the input that is safe to write to: no source patched, no output patched, no main assign. Is the PA off or muted, and is this a COPY of the show rather than the show itself? If you cannot name a safe input, say 'read-only' and the block runs its reading half alone, which is still a pass for that half.",
+					"choices": ["safe input named", "read-only", "stop"],
+					"rehearse": {
+						"answer": "safe input named"
+					}
+				},
+				{
+					"do": "manual",
+					"text": "CLAUDE, the gate must be invisible here (nothing is sent). curl -s 127.0.0.1:8765/api/v1/info and read the console block. On a dLive it names the dLive and carries no verified_on_desk at all; absence means verified on the dLive, so the module drives it. THE CHECK IS A NEGATIVE, and it is the main reason this block exists: 1.2.0 added a per-console gate for the seven other families, and on a dLive it must do nothing. Nothing in Companion's log for this connection may contain 'has not been checked against one' or 'isn't sent on a'. Grep for both. One of those lines on a dLive is a fail, whatever else passes."
+				},
+				{
+					"do": "manual",
+					"text": "CLAUDE, the connection's own words (nothing is sent): curl -s http://127.0.0.1:8888/api/connections | python3 -m json.tool -> the dylanmaudio row's status. Wants category 'ok'. Copy the status string word for word; it is the sentence the operator reads on the Connections tab."
+				},
+				{
+					"do": "manual",
+					"text": "CLAUDE, the cold state, read over HTTP (nothing is sent). There is no answer key on this desk: the SURFACE is the answer, so ask the operator what two channels are called and what one of them sits at, then read: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/name_ch<A>/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/name_ch<B>/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch<A>/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/mute_ch<B>/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/scene_current/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/scene_current_name/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/connected/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/gets_missed/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/unsupported_gets/value. Wants: the names and the level as the surface shows them, connected true. scene_current_name is EXPECTED EMPTY unless a dLive show file has been imported into the module: empty is a pass, not a fail. Then the stereo trio on a channel the operator says is linked: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/linked_ch<S>/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/partner_ch<S>/value; curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/width_ch<S>/value. A dLive cannot report an input's link, so EMPTY is the expected pass -- empty, never false (550c3ba)."
+				},
+				{
+					"do": "manual",
+					"text": "CLAUDE, the writes. SKIP THIS STEP ENTIRELY if step 2 said read-only. Everything here is on the input the operator named, with the PA off or muted. In order, 2 s apart, after re-pointing row 0 at that input: curl -s -X POST http://127.0.0.1:8888/api/location/11/0/0/press (-20 dB); .../11/0/1/press (0 dB); .../11/0/3/press (MUTE on); .../11/0/4/press (MUTE off); .../11/0/2/press (-inf). After each, read it back: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch<N>/value and curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/mute_ch<N>/value for that input. Every one MUST land: a dLive is not a foreign family, so the module converts dB to the dLive's own scale itself and a refusal here is a real fail. The press endpoint answers 204 whether or not a button is there, so a 204 proves nothing; the read-back and the bridge's log are the proof. Put the fader back where the operator found it, by hand if the -inf press is not where it started."
+				},
+				{
+					"do": "manual",
+					"text": "CLAUDE, the fade, which is new in this release (skip if read-only). Companion -> Buttons: on a spare key, add the module's 'Fader level' action with a fade time of 3000 ms on the safe input, target -10 dB; press it, wait 4 s, read curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/fader_ch<N>/value. Then press it again mid-fade with a different target and let it finish. WHAT IS BEING CHECKED is Companion's log, not the fader: a fade the desk never ran now warns, where before it said nothing. Wants: the fade that lands writes NO warning; the fade cut short by the second press writes at most an info line, never a warning. A warning on an ordinary press is a fail, and it is the one thing in 1.2.0 that could nag an operator all night."
+				},
+				{
+					"do": "manual",
+					"text": "CLAUDE, what a recall leaves behind (skip if read-only, or if no scene is safe to recall). Ask the operator for two scenes that are safe to recall on this copy and which PLACE each sits at in the list, then re-point page 11 row 1's first two buttons at those places. Recall the first: curl -s -X POST http://127.0.0.1:8888/api/location/11/1/0/press, then curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/scene_current/value. Then 5 s later read three strip variables the scene changes: their values are EXPECTED STALE on a dLive -- the bridge keeps the pre-recall values until something asks again (#421), and that is the design today. THE FAIL HERE IS EMPTY, NOT STALE: 1.2.0 un-learns a value the bridge reports as unknown, which is right on an Avantis and must never happen on a dLive. An empty name_, mute_ or fader_ variable after a recall is the fail. Recall the second scene, then put the desk back on the scene it was on when you arrived -- the operator does that one at the surface."
+				},
+				{
+					"do": "manual",
+					"text": "CLAUDE, #342: the loaded scene on CONNECT. Only works if the desk is NOT on the first scene in the list, so do it after the recall above, or ask the operator to recall at the surface. Then the operator TOGGLES the dylanmaudio connection off and on in Companion's Connections tab (about 5 s); a Console Bridge restart does NOT test this, because the module keeps its state across a reconnect. BEFORE pressing anything: curl -s http://127.0.0.1:8888/api/variable/dylanmaudio/scene_current/value must read the loaded scene's place. 0, blank or 1 is #342 unfixed. RECORD it either way."
+				},
+				{
+					"do": "ask",
+					"question": "OPERATOR: On Companion's Connections tab, the dylanmaudio row is green/OK (not Connecting, and no error)?",
+					"choices": ["pass", "fail"],
+					"rehearse": {
+						"answer": "pass"
+					}
+				},
+				{
+					"do": "ask",
+					"question": "OPERATOR: Press page 11's 'MUTE on' button for the safe input: does the button go red while that input is muted, and back when you press 'MUTE off'? (Skip if the block ran read-only.)",
+					"choices": ["pass", "fail", "skipped"],
+					"rehearse": {
+						"answer": "pass"
+					}
+				},
+				{
+					"do": "note",
+					"prompt": "CO-TOUR: the module version and the .tgz sha256; the Console Bridge build; which input was named safe, and whether the PA was off and the show a copy; every variable read, with its value, and what the surface showed beside it; the connection status string word for word; the two greps from step 3 (both must find nothing); Companion's log for the day -- the FILE, not the UI buffer: ~/Library/Application Support/companion/logs/companion-<date>.0.log, times in UTC, and set that connection's log level to Debug before the block starts; Console Bridge's log over the same minutes. Anything the operator said, in their words."
+				}
+			]
+		}
+	]
+}
