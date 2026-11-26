@@ -1,6 +1,6 @@
 # Changelog — dylanmaudio-apps (Bitfocus Companion module)
 
-## Unreleased — 1.2.0 (rc.2; the 3 Dec Bitfocus submission)
+## Unreleased — 1.2.0 (rc.3; the 3 Dec Bitfocus submission)
 
 - **Every open-app key works again, and the two windowed apps only open**
   (#705). The Birmingham rehearsal's Companion log (26 Nov 2026) has 13
