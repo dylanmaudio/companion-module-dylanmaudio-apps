@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import { load } from '../../../test/ctlmock.js'
 import { bareNaming, buildControlActions, buildControlFeedbacks, prefixedNaming } from '../definitions.js'
-import { OPEN_APP_ACTION } from '../openapp.js'
+import { DEFAULT_WINDOW_MODE, OPEN_APP_ACTION } from '../openapp.js'
 import type { AppId } from '../registry.js'
 import type { Catalogue } from '../types.js'
 import { APP_LOGOS, MENUBAR_ICONS } from './images.js'
@@ -51,7 +51,13 @@ describe('styled keys', () => {
 					for (const o of f.styleOverrides as Json[]) expect(elementIds, `${id}: override`).toContain(o.elementId)
 				}
 				for (const step of p.steps as Json[])
-					for (const a of step.down as Json[]) expect(actions, `${id}: action`).toContain(a.actionId)
+					for (const a of step.down as Json[]) {
+						expect(actions, `${id}: action`).toContain(a.actionId)
+						// Companion fills in no option defaults when a preset becomes a
+						// control, so every open-app preset must say which press it wants
+						if (a.actionId === OPEN_APP_ACTION)
+							expect(a.options, `${id}: window option`).toEqual({ window: DEFAULT_WINDOW_MODE[app] })
+					}
 			}
 		})
 	}

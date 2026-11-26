@@ -2,6 +2,27 @@
 
 ## Unreleased — 1.2.0 (rc.2; the 3 Dec Bitfocus submission)
 
+- **Every open-app key works again, and the two windowed apps only open**
+  (#705). The Birmingham rehearsal's Companion log (26 Nov 2026) has 13
+  presses that did nothing, across the Show Recorder, Console Control and
+  Time Code Tool connections: `Failed to parse action options for action
+open_app: {"window":"Value is not in the list of choices"}`. #705 gave
+  `open_app` a `window` dropdown, and Companion refuses a dropdown whose
+  stored value isn't one of the choices — it does not fall back to the
+  option's default. Every key built before that option existed has no value
+  for it, and so does every key dropped from the module's own presets, since
+  Companion builds a preset's actions from the preset's options and fills in
+  no defaults. All 18 open-app keys on the operator's own machine were in
+  that state. Two fixes, because it takes both: the presets now carry the
+  option, and an upgrade script fills a missing or invalid one on every key
+  already on a page. The option id is unchanged.
+
+  What it gets filled with is now per app (the operator, 27 Nov 2026). The
+  four menu-bar apps toggle, as before: their window is a panel. Show
+  Recorder and Console Control only bring the window forward — those two
+  _are_ their window, and a second press hiding it mid-show takes away what
+  the first press opened. Both remain settable per key.
+
 - **A feedback the bridge cannot answer now says so.** Nine of the module's
   21 feedbacks read the param family — the three assigns, mix assign, send
   level, HPF and the three preamps — and Client API v1 has no mirror path

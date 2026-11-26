@@ -12,7 +12,7 @@
 import type { CompanionPresetSection } from '@companion-module/base'
 import type { ModuleSchema } from '../../main.js'
 import { actionId, boolFeedbackId, enumFeedbackId, type VariableNaming } from '../definitions.js'
-import { OPEN_APP_ACTION } from '../openapp.js'
+import { DEFAULT_WINDOW_MODE, OPEN_APP_ACTION } from '../openapp.js'
 import type { AppId } from '../registry.js'
 import type { Brand, Catalogue } from '../types.js'
 import { APP_LOGOS, MENUBAR_ICONS } from './images.js'
@@ -69,7 +69,12 @@ export function buildLookPresets(
 	const has = (key: string): boolean => !!cat?.state.some((s) => s.key === key)
 	const control = (id: string): boolean => !!cat?.controls.some((c) => c.id === id)
 	const variable = (key: string): string => `$(${label}:${naming(key)})`
-	const openApp = press(OPEN_APP_ACTION)
+	// The option goes in the preset, not left to the dropdown's default:
+	// Companion builds a preset's actions from the preset's own options and
+	// fills in no defaults, so a key dropped with `{}` here is born with no
+	// `window` value and Companion refuses the press ("Value is not in the
+	// list of choices"). That is how #705 broke every open-app key.
+	const openApp = press(OPEN_APP_ACTION, { window: DEFAULT_WINDOW_MODE[app] })
 
 	// The logo: always there, even with no catalogue — it is how the app gets started.
 	// It is also the only key that wears the app's own colour. The rest of the deck

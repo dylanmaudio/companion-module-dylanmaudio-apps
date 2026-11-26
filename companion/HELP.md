@@ -132,12 +132,15 @@ here without a new version of this module.
   the app's own look:
   - its **logo**, on the app's own colour as the app reports it, and its
     **menu-bar icon** (mirroring every state, with
-    Console Bridge's activity flash). Pressing either opens the app's
-    window, and pressing again closes it; a white bar along the bottom lights
-    while the window is open. An app version that can't close its window from
-    Companion is brought to the front instead. The action's **Press** option
-    can be set to only bring it to the front. If the app isn't running, the
-    log says to start it: Companion never starts an app;
+    Console Bridge's activity flash). For the four menu-bar apps, pressing
+    either opens the app's window and pressing again closes it; a white bar
+    along the bottom lights while the window is open. Show Recorder's and
+    Console Control's keys only bring the window to the front, since those
+    two apps _are_ their window and taking it away mid-show is rarely what
+    you want. Either way round, the action's **Press** option sets it per
+    key. An app version that can't close its window from Companion is brought
+    to the front instead. If the app isn't running, the log says to start it:
+    Companion never starts an app;
   - a round **Run** button that fills green while the app runs;
   - a **level meter** (Talk Light's and Pilot Tone's with the threshold marked);
   - Pilot Tone's **Auto / Latch** keys and **status tile**, amber when

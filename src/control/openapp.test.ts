@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { load } from '../../test/ctlmock.js'
-import { openApp, openAppActions, type OpenAppContext } from './openapp.js'
+import { DEFAULT_WINDOW_MODE, openApp, openAppActions, windowModeOf, type OpenAppContext } from './openapp.js'
 import type { Catalogue } from './types.js'
 
 const tlt = (): Catalogue => {
@@ -106,6 +106,48 @@ describe('Open <app>', () => {
 		const { ctx, calls } = context({ running: () => true, catalogue: () => odd })
 		await openApp(ctx)
 		expect(calls.pressed).toEqual(['tlt.show'])
+	})
+
+	// The operator, 27 Nov 2026: "if we can default SR and CxC buttons to go to
+	// open app, and menu bar apps open and close, that will be good".
+	it('is born toggling for a menu-bar app and showing for a windowed one', () => {
+		expect(DEFAULT_WINDOW_MODE).toEqual({
+			bridge: 'toggle',
+			tlt: 'toggle',
+			ptt: 'toggle',
+			tct: 'toggle',
+			cxc: 'show',
+			sr: 'show',
+		})
+		for (const app of ['bridge', 'tlt', 'ptt', 'tct', 'cxc', 'sr'] as const) {
+			const { ctx } = context({ app })
+			const option = openAppActions(ctx).open_app?.options?.[0] as { default?: string } | undefined
+			expect(option?.default, app).toBe(DEFAULT_WINDOW_MODE[app])
+		}
+	})
+
+	it("only brings Show Recorder's window forward, where a menu-bar app's toggles", async () => {
+		const srCat = (): Catalogue => {
+			const c = tlt()
+			return {
+				...c,
+				app: 'sr',
+				controls: c.controls.map((x) => ({ ...x, id: x.id.replace(/^tlt\./, 'sr.') })),
+				state: c.state.map((x) => ({ ...x, key: x.key.replace(/^tlt\./, 'sr.') })),
+			}
+		}
+		const { ctx, calls } = context({ app: 'sr', running: () => true, catalogue: srCat })
+		await openAppActions(ctx).open_app?.callback({ options: { window: 'show' } }, {})
+		expect(calls.pressed).toEqual(['sr.show'])
+		expect(calls.values).toEqual([undefined])
+	})
+
+	it("falls back to the app's default for a value Companion would refuse", () => {
+		expect(windowModeOf('sr', undefined)).toBe('show')
+		expect(windowModeOf('sr', 'toggle')).toBe('toggle')
+		expect(windowModeOf('tct', undefined)).toBe('toggle')
+		expect(windowModeOf('tct', 'open')).toBe('toggle')
+		expect(windowModeOf('cxc', '')).toBe('show')
 	})
 
 	it('is one action, named for the app', () => {

@@ -5,7 +5,8 @@
  * window through the catalogue's `<app>.window` toggle (#705), so a window
  * opened from a deck can be closed from it too. An app without that toggle is
  * asked to show itself through `<app>.show`, as before. The action can be set
- * to show only. The module
+ * to show only, and which of the two a new key is born with is per app
+ * (DEFAULT_WINDOW_MODE). The module
  * never starts an app: that would take Companion's child-process permission,
  * which marks a module as dangerous to its users. A key pressed while the app
  * is down says in the log to start it, on this Mac or the one it is on.
@@ -42,6 +43,39 @@ export function windowControlOf(cat: Catalogue | null, app: AppId): string | nul
 
 export type OpenAppMode = 'toggle' | 'show'
 
+/**
+ * What a press does by default, per app (the operator, 27 Nov 2026).
+ *
+ * The four menu-bar apps live in the menu bar: their window is a panel, and a
+ * second press putting it away is what a deck key should do. Show Recorder and
+ * Console Control *are* their window — hiding it mid-show takes away the thing
+ * the first press just opened — so their keys only bring it forward. This is
+ * what a new key is born with; a key set the other way keeps working.
+ */
+export const DEFAULT_WINDOW_MODE: Record<AppId, OpenAppMode> = {
+	bridge: 'toggle',
+	tlt: 'toggle',
+	ptt: 'toggle',
+	tct: 'toggle',
+	cxc: 'show',
+	sr: 'show',
+}
+
+/**
+ * The stored `window` option, or this app's default when it is missing or is
+ * not one of the two.
+ *
+ * Companion refuses a dropdown whose stored value isn't in its choices, so a
+ * key saved before #705 never reaches this callback at all: it fails with
+ * "Value is not in the list of choices" and the press does nothing. What
+ * rescues those keys is `fillOpenAppWindow` in src/upgrades.ts. This keeps the
+ * callback honest for anything that arrives another way (the HTTP API, a
+ * hand-edited config).
+ */
+export function windowModeOf(app: AppId, stored: unknown): OpenAppMode {
+	return stored === 'toggle' || stored === 'show' ? stored : DEFAULT_WINDOW_MODE[app]
+}
+
 export async function openApp(ctx: OpenAppContext, abort?: AbortSignal, mode: OpenAppMode = 'toggle'): Promise<void> {
 	const name = CONTROL_APPS[ctx.app].name
 	if (!ctx.running()) {
@@ -63,23 +97,27 @@ export async function openApp(ctx: OpenAppContext, abort?: AbortSignal, mode: Op
 
 export function openAppActions(ctx: OpenAppContext): ReturnType<typeof buildControlActions> {
 	const name = CONTROL_APPS[ctx.app].name
+	const fallback = DEFAULT_WINDOW_MODE[ctx.app]
 	return {
 		[OPEN_APP_ACTION]: {
 			name: `Open ${name}`,
-			description: `Opens ${name}'s window, or closes it if it is open (bringing it to the front, for an app that can't say). If it isn't running, the log says so: start it first.`,
+			description:
+				fallback === 'toggle'
+					? `Opens ${name}'s window, or closes it if it is open (bringing it to the front, for an app that can't say). If it isn't running, the log says so: start it first.`
+					: `Brings ${name}'s window to the front. Set "Press" the other way to close it again on a second press. If it isn't running, the log says so: start it first.`,
 			options: [
 				{
 					type: 'dropdown',
 					id: 'window',
 					label: 'Press',
-					default: 'toggle',
+					default: fallback,
 					choices: [
 						{ id: 'toggle', label: 'Opens the window, or closes it' },
 						{ id: 'show', label: 'Only brings it to the front' },
 					],
 				},
 			],
-			callback: async (a, c) => openApp(ctx, c?.signal, a.options.window === 'show' ? 'show' : 'toggle'),
+			callback: async (a, c) => openApp(ctx, c?.signal, windowModeOf(ctx.app, a.options.window)),
 		},
 	}
 }
