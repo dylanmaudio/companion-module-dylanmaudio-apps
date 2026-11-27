@@ -1,5 +1,35 @@
 # Changelog — dylanmaudio-apps (Bitfocus Companion module)
 
+## Unreleased
+
+- **Timed fades are findable** (#771). The module has faded a fader to a
+  level over a duration since 1.0, and on 27 Nov 2026 the operator asked for
+  it as a new feature — "that might be a nice feature in companion to have -
+  fade to a level over time" — having spent a rehearsal pressing ±1 dB keys
+  by hand instead. Nothing was broken; nothing said it was there. The field
+  was labelled "Fade (ms)" with a default of 0, which reads as a switch to
+  leave alone, and the unit was only in the label, so a 3 second fade is
+  `3000` and there was nothing to tell you that. Every shipped preset passed
+  `fade: 0`, so dropping a key never showed it either, and HELP.md described
+  fades in seconds while the field wanted milliseconds.
+
+  So: the label now reads **Fade (ms — 3000 = 3 s)** and the tooltip works
+  the conversion; there is a new **… to 0 dB over 3 s** preset per fader
+  type, beside the existing level and ±1 dB ones; and HELP.md has a
+  **Timed fades** section that names the action and the unit. The option id,
+  type, unit and default are unchanged, so every key already built keeps the
+  behaviour it has — this release only makes the feature say its own name.
+
+- **Send level no longer offers a fade it cannot do** (#770). The field was
+  on the action and did nothing: the bridge's `fade` op takes a strip's own
+  fader only and has no send target, and sends are capability-gated until the
+  bridge has calibrated the console's send law, so a ramp would be refused a
+  step at a time. The option is gone from the action rather than wired, and
+  HELP.md says a send moves in one step and why. A stored `fade` on a key
+  built earlier is still honoured and still lands as a jump, which is what it
+  did before, so no button changes behaviour. A real send fade needs the
+  bridge op first.
+
 ## 1.1.2 — 2026-11
 
 A review-fix release. Nothing in it changes what a button does — except

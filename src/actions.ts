@@ -250,7 +250,17 @@ export function buildActions(ctx: ModuleContext): CompanionActionDefinitions<Act
 					max: 127,
 					step: 0.5,
 				},
-				FADE_FIELD,
+				// No FADE_FIELD here (#770). The bridge's `fade` op takes a strip's
+				// own fader only — type, index, to_lv/to_db, over_ms — and has no
+				// send target (MIDI Bridge, confirmed from the bridge source
+				// 27 Nov 2026), and sends are capability-gated until the bridge has
+				// calibrated the send law, so a ramp would be refused a step at a
+				// time. The field was offered here and did nothing, which is worse
+				// than not offering it. A send fade needs the bridge op first.
+				//
+				// The callback still honours a stored `fade` rather than ignoring
+				// it: keys built before this release may carry one, and both paths
+				// reach the same place anyway — bridge mode jumps either way.
 			],
 			callback: run((o) => {
 				const src = readChannel(o)

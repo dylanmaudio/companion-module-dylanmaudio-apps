@@ -92,8 +92,15 @@ export function socketFields(): Field[] {
 export const FADE_FIELD: Field = {
 	type: 'number',
 	id: 'fade',
-	label: 'Fade (ms)',
-	tooltip: '0 = jump. Ramps are dB-linear and only send when the value changes.',
+	// The unit is in the label as well as the tooltip, and with a worked
+	// number. On 27 Nov 2026 the operator asked for "fade to a level over
+	// time" as a new feature, having had it since 1.0: they were hand-riding
+	// ±1 dB keys instead. 'Fade (ms)' next to a 0 default reads as a
+	// switch you leave alone, and nobody converts seconds in their head
+	// mid-show. companion/HELP.md says the same thing the same way.
+	label: 'Fade (ms — 3000 = 3 s)',
+	tooltip:
+		'How long to travel to the new level. 0 = jump. Milliseconds, so a 3 second fade is 3000. Ramps are dB-linear and only send when the value changes, so a 3 s fade is ~60 messages, not 600.',
 	default: 0,
 	min: 0,
 	max: 600_000,

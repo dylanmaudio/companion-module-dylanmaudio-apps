@@ -276,8 +276,25 @@ nothing. Use **Scene recall**, which is a MixRack message and works.
 Channel numbers accept expressions, so `$(custom:channel)` in the Number
 field works for "selected channel" layouts.
 
+### Timed fades
+
+Every fader action has a **Fade (ms)** field, so "fade to −6 dB over 3
+seconds" is **Fader: set level (dB)** with the level and a fade of
+`3000`. The unit is milliseconds — a 3 second fade is **3000**, not 3 —
+and `0` means jump, which is what every shipped preset uses except
+**… to 0 dB over 3 s**. It works the same on **set level**, **adjust by
+dB** and **set raw value**.
+
+**Send level** has no fade field, and a send always moves in one step.
+The bridge's fade is a strip's own fader only, and sends are
+capability-gated until the bridge has calibrated the console's send law,
+so a ramp would be refused a step at a time. Fade a send by fading what
+feeds it.
+
 Fades are dB-linear and only send when the value changes (a 3 s fade is
-~60 messages, not 600).
+~60 messages, not 600). In bridge mode the MIDI Bridge runs the ramp, so
+it keeps going even if Companion is busy; where a bridge or a console
+can't fade, the move lands as a jump and the log says so.
 
 ## Feedbacks
 
@@ -319,13 +336,13 @@ sends arrives.
 
 What costs a slot:
 
-| What you run | MixRack connections |
-|---|---|
-| **This module, through MIDI Bridge** | **one, shared.** Console Control, a DAW and every dylanmaudio app ride the same bridge connection |
-| A direct dLive Companion module aimed at the MixRack | one each |
-| `allenheath-dlive-ilive` | one, plus A&H's network port 51321 |
-| A direct module aimed at the **Surface** (51328) | probably none — unmeasured |
-| A&H Director | unmeasured |
+| What you run                                         | MixRack connections                                                                               |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **This module, through MIDI Bridge**                 | **one, shared.** Console Control, a DAW and every dylanmaudio app ride the same bridge connection |
+| A direct dLive Companion module aimed at the MixRack | one each                                                                                          |
+| `allenheath-dlive-ilive`                             | one, plus A&H's network port 51321                                                                |
+| A direct module aimed at the **Surface** (51328)     | probably none — unmeasured                                                                        |
+| A&H Director                                         | unmeasured                                                                                        |
 
 That shared connection is the point of the bridge: you can add apps
 without spending slots, and one MIDI monitor attributes every message to

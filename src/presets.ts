@@ -152,6 +152,29 @@ export function buildPresets(
 				},
 			],
 		}
+		// A key that *shows* the timed fade exists. Every other level preset
+		// ships `fade: 0`, so the option was only ever met by scrolling the
+		// action's own fields — and the operator never did (#771). 3 s is a
+		// usable default for a music change rather than a demo value.
+		presets[`fade_${type}`] = {
+			type: 'simple',
+			name: `${label} to 0 dB over 3 s`,
+			style: {
+				text: '$(local:name)\\n0 dB ⟶ 3 s',
+				textExpression: false,
+				size: TEXT,
+				color: WHITE,
+				bgcolor: DARK,
+			},
+			localVariables: [chVar, nameVar(type), dbVar(type)],
+			feedbacks: [],
+			steps: [
+				{
+					down: [{ actionId: 'fader', options: { type, index: expr('$(local:ch)'), db: '0', fade: 3000 } }],
+					up: [],
+				},
+			],
+		}
 		sections.push({
 			id: `levels_${type}`,
 			name: `Faders — ${label}s`,
@@ -177,6 +200,14 @@ export function buildPresets(
 					type: 'template',
 					name: `${label}: −1 dB`,
 					presetId: `down_${type}`,
+					templateVariableName: 'ch',
+					templateValues: values,
+				},
+				{
+					id: `fade_${type}_t`,
+					type: 'template',
+					name: `${label}: to 0 dB over 3 s`,
+					presetId: `fade_${type}`,
 					templateVariableName: 'ch',
 					templateValues: values,
 				},
